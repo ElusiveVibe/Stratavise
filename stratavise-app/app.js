@@ -1327,11 +1327,19 @@ function renderAdminCriteria() {
           <button onclick="openCriterionModal()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-1.5 rounded-md">+ Add Criterion</button>
         </div>
       </div>
-      <table class="w-full text-sm max-w-xl">
-        <thead><tr class="text-left text-slate-400 border-b border-slate-200 dark:border-slate-700"><th class="py-2">Criteria</th><th class="py-2">Weight</th><th class="py-2">Action</th></tr></thead>
-        <tbody>${criteriaRows}</tbody>
-      </table>
-      ${weightTotal !== 100 ? `<p class="text-xs text-red-500 mt-2">⚠ Weights should total 100% for scores to read as a true percentage.</p>` : ''}
+      <div class="grid lg:grid-cols-2 gap-5 items-start">
+        <div>
+          <table class="w-full text-sm">
+            <thead><tr class="text-left text-slate-400 border-b border-slate-200 dark:border-slate-700"><th class="py-2">Criteria</th><th class="py-2">Weight</th><th class="py-2">Action</th></tr></thead>
+            <tbody>${criteriaRows}</tbody>
+          </table>
+          ${weightTotal !== 100 ? `<p class="text-xs text-red-500 mt-2">⚠ Weights should total 100% for scores to read as a true percentage.</p>` : ''}
+        </div>
+        <div class="max-w-xs mx-auto w-full">
+          <h4 class="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2 text-center">Weight Distribution</h4>
+          <canvas id="criteriaWeightPie" height="220"></canvas>
+        </div>
+      </div>
     </div>
 
     <div class="bg-white dark:bg-slate-800 rounded-xl card-shadow p-5 mb-5">
@@ -1357,7 +1365,21 @@ function renderAdminCriteria() {
     </div>
     <div id="modalRoot"></div>
   `);
+
+  if (_critWeightPie) _critWeightPie.destroy();
+  const weightCtx = document.getElementById('criteriaWeightPie');
+  if (weightCtx) {
+    _critWeightPie = new Chart(weightCtx, {
+      type: 'pie',
+      data: {
+        labels: db.criteria.map(c => `${c.name} (${c.weight}%)`),
+        datasets: [{ data: db.criteria.map(c => c.weight), backgroundColor: PIE_COLORS }]
+      },
+      options: { plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } } }
+    });
+  }
 }
+let _critWeightPie = null;
 
 /* --- Criterion modal --- */
 function openCriterionModal(id) {
