@@ -644,6 +644,28 @@ function submitEvaluation(employeeId) {
   showEvalSuccessModal(record);
 }
 
+/* Shared helper: draws a pie chart showing how much each criterion contributed to
+   a given evaluation's final score. Used right after submitting an evaluation, on
+   the employee's Progress Tracker, and in the Admin evaluation-detail view. */
+let _critPieChart = null;
+const PIE_COLORS = ['#f9a8d4', '#7dd3fc', '#fde68a', '#86efac', '#c4b5fd', '#fdba74', '#fca5a5', '#67e8f9', '#d8b4fe', '#bef264'];
+
+function drawCriteriaPie(canvasId, ratings) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const criteria = getCriteria();
+  const breakdown = criteria.map(c => ({ name: c.name, pct: Math.round(((ratings[c.id] || 0) / 5) * c.weight * 10) / 10 }));
+  if (_critPieChart) _critPieChart.destroy();
+  _critPieChart = new Chart(canvas, {
+    type: 'pie',
+    data: {
+      labels: breakdown.map(b => `${b.name} (${b.pct}%)`),
+      datasets: [{ data: breakdown.map(b => b.pct), backgroundColor: PIE_COLORS }]
+    },
+    options: { plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } } }
+  });
+}
+
 function showEvalSuccessModal(record) {
   document.getElementById('modalRoot').innerHTML = `
   <div class="fixed inset-0 modal-backdrop flex items-center justify-center z-40 p-4">
@@ -653,9 +675,12 @@ function showEvalSuccessModal(record) {
       <p class="text-sm text-slate-500 dark:text-slate-400">Date Completed: ${record.date}</p>
       <p class="text-sm text-slate-500 dark:text-slate-400 mb-4">Time Completed: ${record.time}</p>
       <p class="text-sm mb-4"><span class="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300 font-bold px-3 py-1 rounded-full">${record.finalScore}% &middot; ${record.level}</span></p>
-      <button onclick="closeModal(); location.hash='#/evaluate'" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 rounded-lg">Back to Evaluate</button>
+      <p class="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2">Score breakdown by criteria</p>
+      <canvas id="successPieCanvas" height="200"></canvas>
+      <button onclick="closeModal(); location.hash='#/evaluate'" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 rounded-lg mt-4">Back to Evaluate</button>
     </div>
   </div>`;
+  drawCriteriaPie('successPieCanvas', record.ratings);
 }
 
 /* ---------------------- PROGRESS TRACKER ---------------------- */
@@ -705,7 +730,11 @@ function renderProgressTracker() {
         </div>
         <div class="bg-white dark:bg-slate-800 rounded-xl card-shadow p-5">
           <h3 class="text-sm font-semibold text-slate-500 dark:text-slate-400 mb-2">Performance Radar</h3>
-          <canvas id="radarChartCanvas" height="260"></canvas>
+          <canvas id="radarChartCanvas" height="220"></canvas>
+        </div>
+        <div class="bg-white dark:bg-slate-800 rounded-xl card-shadow p-5 lg:col-span-2">
+          <h3 class="text-sm font-semibold text-slate-500 dark:text-slate-400 mb-2">Score Breakdown by Criteria</h3>
+          <div class="max-w-sm mx-auto"><canvas id="progressPieCanvas" height="220"></canvas></div>
         </div>
       </div>
     `);
@@ -720,6 +749,7 @@ function renderProgressTracker() {
       },
       options: { scales: { r: { min: 0, max: 5, ticks: { stepSize: 1 } } }, plugins: { legend: { display: false } } }
     });
+    drawCriteriaPie('progressPieCanvas', ev.ratings);
   } else {
     const historyCards = myEvals.map(ev => `
       <div class="bg-white dark:bg-slate-800 rounded-xl card-shadow p-4">
@@ -1692,10 +1722,12 @@ function viewAdminEvaluation(evalId) {
         <p class="text-sm text-slate-700 dark:text-slate-200"><strong>Evaluator:</strong> ${evaluator ? evaluator.name : 'Unknown'}</p>
         <p class="text-sm text-slate-700 dark:text-slate-200 mb-3"><strong>Date:</strong> ${ev.date} &middot; ${ev.time}</p>
         <table class="w-full text-sm mb-3">${rows}</table>
-        <div class="bg-emerald-50 dark:bg-emerald-900/30 rounded-lg p-3 text-center">
+        <div class="bg-emerald-50 dark:bg-emerald-900/30 rounded-lg p-3 text-center mb-3">
           <span class="text-xl font-bold text-emerald-700 dark:text-emerald-300">${ev.finalScore}%</span>
           <p class="text-sm text-emerald-600 dark:text-emerald-400 font-semibold">${ev.level}</p>
         </div>
+        <p class="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2 text-center">Score breakdown by criteria</p>
+        <div class="max-w-[220px] mx-auto"><canvas id="adminEvalPieCanvas" height="200"></canvas></div>
       </div>
       <div class="px-5 py-4 bg-slate-50 dark:bg-slate-900/40 flex justify-end gap-2">
         <button onclick="deleteAdminEvaluation('${ev.id}')" class="px-4 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white font-semibold">Delete</button>
@@ -1703,6 +1735,7 @@ function viewAdminEvaluation(evalId) {
       </div>
     </div>
   </div>`;
+  drawCriteriaPie('adminEvalPieCanvas', ev.ratings);
 }
 
 function deleteAdminEvaluation(evalId) {
