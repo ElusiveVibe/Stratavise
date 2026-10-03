@@ -1347,10 +1347,16 @@ function renderAdminCriteria() {
         <h3 class="font-semibold text-slate-700 dark:text-slate-200">Performance Rating Scale</h3>
         <button onclick="openScaleModal()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-1.5 rounded-md">+ Add Tier</button>
       </div>
-      <table class="w-full text-sm max-w-xl">
-        <thead><tr class="text-left text-slate-400 border-b border-slate-200 dark:border-slate-700"><th class="py-2">Final Score</th><th class="py-2">Performance Level</th><th class="py-2">Action</th></tr></thead>
-        <tbody>${scaleRows}</tbody>
-      </table>
+      <div class="grid lg:grid-cols-2 gap-5 items-start">
+        <table class="w-full text-sm">
+          <thead><tr class="text-left text-slate-400 border-b border-slate-200 dark:border-slate-700"><th class="py-2">Final Score</th><th class="py-2">Performance Level</th><th class="py-2">Action</th></tr></thead>
+          <tbody>${scaleRows}</tbody>
+        </table>
+        <div>
+          <h4 class="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2 text-center">Scale Coverage (0–100)</h4>
+          <canvas id="ratingScaleChart" height="140"></canvas>
+        </div>
+      </div>
     </div>
 
     <div class="bg-white dark:bg-slate-800 rounded-xl card-shadow p-5 overflow-x-auto">
@@ -1378,8 +1384,32 @@ function renderAdminCriteria() {
       options: { plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } } }
     });
   }
+
+  if (_ratingScaleChart) _ratingScaleChart.destroy();
+  const scaleCtx = document.getElementById('ratingScaleChart');
+  if (scaleCtx) {
+    const sortedScale = db.ratingScale.slice().sort((a, b) => a.min - b.min);
+    _ratingScaleChart = new Chart(scaleCtx, {
+      type: 'bar',
+      data: {
+        labels: ['0–100 range'],
+        datasets: sortedScale.map((r, i) => ({
+          label: `${r.label} (${r.min}\u2013${r.max})`,
+          data: [r.max - r.min + 1],
+          backgroundColor: PIE_COLORS[i % PIE_COLORS.length]
+        }))
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        scales: { x: { stacked: true, min: 0, max: 101, ticks: { stepSize: 20 } }, y: { stacked: true, display: false } },
+        plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 9 } } }, tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${ctx.raw} pts wide` } } }
+      }
+    });
+  }
 }
 let _critWeightPie = null;
+let _ratingScaleChart = null;
 
 /* --- Criterion modal --- */
 function openCriterionModal(id) {
@@ -1734,26 +1764,30 @@ function viewAdminEvaluation(evalId) {
 
   document.getElementById('modalRoot').innerHTML = `
   <div class="fixed inset-0 modal-backdrop flex items-center justify-center z-40 p-4">
-    <div class="bg-white dark:bg-slate-800 rounded-xl w-full max-w-md overflow-hidden shadow-2xl">
-      <div class="bg-sky-600 text-white px-5 py-3 flex items-center justify-between">
+    <div class="bg-white dark:bg-slate-800 rounded-xl w-full max-w-3xl overflow-hidden shadow-2xl flex flex-col max-h-[88vh]">
+      <div class="bg-sky-600 text-white px-5 py-3 flex items-center justify-between shrink-0">
         <h3 class="font-semibold">Evaluation Detail</h3>
-        <button onclick="closeModal()" class="text-white/80 hover:text-white">✕</button>
+        <button onclick="closeModal()" class="text-white/80 hover:text-white text-xl leading-none" title="Close">✕</button>
       </div>
-      <div class="p-5">
-        <p class="text-sm text-slate-700 dark:text-slate-200"><strong>Employee:</strong> ${emp ? emp.name : 'Unknown'}</p>
-        <p class="text-sm text-slate-700 dark:text-slate-200"><strong>Evaluator:</strong> ${evaluator ? evaluator.name : 'Unknown'}</p>
-        <p class="text-sm text-slate-700 dark:text-slate-200 mb-3"><strong>Date:</strong> ${ev.date} &middot; ${ev.time}</p>
-        <table class="w-full text-sm mb-3">${rows}</table>
-        <div class="bg-emerald-50 dark:bg-emerald-900/30 rounded-lg p-3 text-center mb-3">
-          <span class="text-xl font-bold text-emerald-700 dark:text-emerald-300">${ev.finalScore}%</span>
-          <p class="text-sm text-emerald-600 dark:text-emerald-400 font-semibold">${ev.level}</p>
+      <div class="p-5 overflow-y-auto grid md:grid-cols-2 gap-6">
+        <div>
+          <p class="text-sm text-slate-700 dark:text-slate-200"><strong>Employee:</strong> ${emp ? emp.name : 'Unknown'}</p>
+          <p class="text-sm text-slate-700 dark:text-slate-200"><strong>Evaluator:</strong> ${evaluator ? evaluator.name : 'Unknown'}</p>
+          <p class="text-sm text-slate-700 dark:text-slate-200 mb-3"><strong>Date:</strong> ${ev.date} &middot; ${ev.time}</p>
+          <table class="w-full text-sm mb-3">${rows}</table>
+          <div class="bg-emerald-50 dark:bg-emerald-900/30 rounded-lg p-3 text-center">
+            <span class="text-xl font-bold text-emerald-700 dark:text-emerald-300">${ev.finalScore}%</span>
+            <p class="text-sm text-emerald-600 dark:text-emerald-400 font-semibold">${ev.level}</p>
+          </div>
         </div>
-        <p class="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2 text-center">Score breakdown by criteria</p>
-        <div class="max-w-[220px] mx-auto"><canvas id="adminEvalPieCanvas" height="200"></canvas></div>
+        <div>
+          <p class="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2 text-center">Score breakdown by criteria</p>
+          <div class="max-w-[260px] mx-auto"><canvas id="adminEvalPieCanvas" height="230"></canvas></div>
+        </div>
       </div>
-      <div class="px-5 py-4 bg-slate-50 dark:bg-slate-900/40 flex justify-end gap-2">
+      <div class="px-5 py-4 bg-slate-50 dark:bg-slate-900/40 flex justify-end gap-2 shrink-0 border-t border-slate-200 dark:border-slate-700">
         <button onclick="deleteAdminEvaluation('${ev.id}')" class="px-4 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white font-semibold">Delete</button>
-        <button onclick="closeModal()" class="px-4 py-2 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700">Close</button>
+        <button onclick="closeModal()" class="px-4 py-2 rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-300 dark:hover:bg-slate-600 font-semibold">&larr; Back to List</button>
       </div>
     </div>
   </div>`;
