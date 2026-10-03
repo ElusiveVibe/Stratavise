@@ -162,6 +162,7 @@ function router() {
 
   if (segs[0] === 'login') {
     if (segs[1] === 'admin') return renderAdminLogin();
+    if (segs[1] === 'register') return renderRegister();
     if (segs[1] === 'position') return renderLoginPosition(segs[2]);
     if (segs[1] === 'credentials') return renderLoginCredentials(segs[2], segs[3]);
     return renderLoginDept();
@@ -297,10 +298,80 @@ function renderLoginDept() {
     <h1 class="text-2xl font-bold text-slate-800 dark:text-slate-100 text-center mb-1">Choose your department</h1>
     <p class="text-slate-400 text-center mb-8">to continue to evaluate</p>
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">${cards}</div>
-    <div class="text-center mt-8 pt-5 border-t border-slate-100 dark:border-slate-700">
+    <div class="text-center mt-6">
+      <button onclick="location.hash='#/login/register'" class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold px-5 py-2.5 rounded-lg">+ New Employee? Create an Account</button>
+    </div>
+    <div class="text-center mt-5 pt-5 border-t border-slate-100 dark:border-slate-700">
       <button onclick="location.hash='#/login/admin'" class="text-sm text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 font-medium">🔐 Sign in as Administrator</button>
     </div>
   `);
+}
+
+/* ---------------------- LOGIN: New Employee Self-Registration ---------------------- */
+function renderRegister() {
+  const depts = getDepartments();
+  authShell(`
+    <button onclick="location.hash='#/login'" class="text-sm text-slate-400 hover:text-slate-600 mb-4">&larr; Back</button>
+    <div class="text-center mb-6">
+      <div class="text-4xl mb-2">🆕</div>
+      <h1 class="text-2xl font-bold text-slate-800 dark:text-slate-100">Create Your Account</h1>
+      <p class="text-slate-400 text-sm">Your password will be set to <strong>demo123</strong> — you can change it later in Settings.</p>
+    </div>
+    <div class="max-w-sm mx-auto space-y-3">
+      <div>
+        <label class="block text-sm text-slate-500 dark:text-slate-300 mb-1">Full Name</label>
+        <input id="regName" class="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg px-3 py-2" placeholder="e.g. Juan Dela Cruz" />
+      </div>
+      <div>
+        <label class="block text-sm text-slate-500 dark:text-slate-300 mb-1">Department</label>
+        <select id="regDept" class="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg px-3 py-2">
+          ${depts.map(d => `<option value="${d.key}">${d.label}</option>`).join('')}
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm text-slate-500 dark:text-slate-300 mb-1">Position</label>
+        <select id="regRole" class="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg px-3 py-2">
+          <option value="employee">Employee</option>
+          <option value="supervisor">Supervisor</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm text-slate-500 dark:text-slate-300 mb-1">Job Title</label>
+        <input id="regJobTitle" class="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg px-3 py-2" placeholder="e.g. Marketing Associate" />
+      </div>
+      <p id="regError" class="text-red-500 text-sm hidden"></p>
+      <button onclick="submitRegister()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 rounded-lg transition mt-2">Create Account &amp; Sign In</button>
+    </div>
+  `);
+}
+
+function submitRegister() {
+  const name = document.getElementById('regName').value.trim();
+  const dept = document.getElementById('regDept').value;
+  const role = document.getElementById('regRole').value;
+  const jobTitle = document.getElementById('regJobTitle').value.trim();
+  const err = document.getElementById('regError');
+
+  if (!name || !jobTitle) {
+    err.textContent = 'Please fill in your name and job title.';
+    err.classList.remove('hidden');
+    return;
+  }
+  const db = getDB();
+  const dupe = db.users.find(u => u.dept === dept && u.role === role && u.name.toLowerCase() === name.toLowerCase());
+  if (dupe) {
+    err.textContent = 'Someone with that name already has an account in this department/position. Try adding a middle initial.';
+    err.classList.remove('hidden');
+    return;
+  }
+
+  const newUser = { id: uid('u'), name, dept, role, jobTitle, password: 'demo123', avatar: null };
+  db.users.push(newUser);
+  setDB(db);
+
+  setSession({ type: 'staff', userId: newUser.id });
+  toast(`Welcome, ${name.split(' ')[0]}! Your password is demo123.`);
+  location.hash = '#/home';
 }
 
 /* ---------------------- LOGIN: Step 2 - Choose Position ---------------------- */
@@ -513,18 +584,30 @@ function renderIncentives() {
 
     <div class="bg-white dark:bg-slate-800 rounded-xl card-shadow p-5 mb-5">
       <h3 class="font-semibold text-slate-700 dark:text-slate-200 mb-3">Performance Criteria</h3>
-      <table class="w-full text-sm max-w-md">
-        <thead><tr class="text-left text-slate-400 border-b border-slate-200 dark:border-slate-700"><th class="py-2">Criteria</th><th class="py-2 text-right">Weight</th></tr></thead>
-        <tbody>${criteriaRows}<tr><td class="py-2 font-bold text-slate-800 dark:text-slate-100">Total</td><td class="py-2 text-right font-bold text-slate-800 dark:text-slate-100">${totalWeight}%</td></tr></tbody>
-      </table>
+      <div class="grid lg:grid-cols-2 gap-5 items-start">
+        <table class="w-full text-sm">
+          <thead><tr class="text-left text-slate-400 border-b border-slate-200 dark:border-slate-700"><th class="py-2">Criteria</th><th class="py-2 text-right">Weight</th></tr></thead>
+          <tbody>${criteriaRows}<tr><td class="py-2 font-bold text-slate-800 dark:text-slate-100">Total</td><td class="py-2 text-right font-bold text-slate-800 dark:text-slate-100">${totalWeight}%</td></tr></tbody>
+        </table>
+        <div class="max-w-xs mx-auto w-full">
+          <h4 class="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2 text-center">Weight Distribution</h4>
+          <canvas id="staffCriteriaWeightPie" height="220"></canvas>
+        </div>
+      </div>
     </div>
 
     <div class="bg-white dark:bg-slate-800 rounded-xl card-shadow p-5 mb-5">
       <h3 class="font-semibold text-slate-700 dark:text-slate-200 mb-3">Performance Rating Scale</h3>
-      <table class="w-full text-sm max-w-md">
-        <thead><tr class="text-left text-slate-400 border-b border-slate-200 dark:border-slate-700"><th class="py-2">Final Score</th><th class="py-2">Performance Level</th></tr></thead>
-        <tbody>${scaleRows}</tbody>
-      </table>
+      <div class="grid lg:grid-cols-2 gap-5 items-start">
+        <table class="w-full text-sm">
+          <thead><tr class="text-left text-slate-400 border-b border-slate-200 dark:border-slate-700"><th class="py-2">Final Score</th><th class="py-2">Performance Level</th></tr></thead>
+          <tbody>${scaleRows}</tbody>
+        </table>
+        <div>
+          <h4 class="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2 text-center">Scale Coverage (0–100)</h4>
+          <canvas id="staffRatingScaleChart" height="140"></canvas>
+        </div>
+      </div>
     </div>
 
     <div class="bg-white dark:bg-slate-800 rounded-xl card-shadow p-5 overflow-x-auto">
@@ -535,7 +618,45 @@ function renderIncentives() {
       </table>
     </div>
   `);
+
+  if (_staffCritWeightPie) _staffCritWeightPie.destroy();
+  const weightCtx = document.getElementById('staffCriteriaWeightPie');
+  if (weightCtx) {
+    _staffCritWeightPie = new Chart(weightCtx, {
+      type: 'pie',
+      data: {
+        labels: criteria.map(c => `${c.name} (${c.weight}%)`),
+        datasets: [{ data: criteria.map(c => c.weight), backgroundColor: PIE_COLORS }]
+      },
+      options: { plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } } }
+    });
+  }
+
+  if (_staffRatingScaleChart) _staffRatingScaleChart.destroy();
+  const scaleCtx = document.getElementById('staffRatingScaleChart');
+  if (scaleCtx) {
+    const sortedScale = ratingScale.slice().sort((a, b) => a.min - b.min);
+    _staffRatingScaleChart = new Chart(scaleCtx, {
+      type: 'bar',
+      data: {
+        labels: ['0–100 range'],
+        datasets: sortedScale.map((r, i) => ({
+          label: `${r.label} (${r.min}\u2013${r.max})`,
+          data: [r.max - r.min + 1],
+          backgroundColor: PIE_COLORS[i % PIE_COLORS.length]
+        }))
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        scales: { x: { stacked: true, min: 0, max: 101, ticks: { stepSize: 20 } }, y: { stacked: true, display: false } },
+        plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 9 } } }, tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${ctx.raw} pts wide` } } }
+      }
+    });
+  }
 }
+let _staffCritWeightPie = null;
+let _staffRatingScaleChart = null;
 
 /* ---------------------- EVALUATE: Choose who ---------------------- */
 let _evalSearch = '';

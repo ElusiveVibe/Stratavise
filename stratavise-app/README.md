@@ -20,6 +20,10 @@ Supervisor or Employee → type a name (autocomplete will suggest matches) → p
 **Administrator:** click "🔐 Sign in as Administrator" at the bottom of the department
 screen. Username **`admin`**, password **`admin123`**.
 
+**New employee?** Click "+ New Employee? Create an Account" on the department screen —
+fill in name, department, position, and job title, and the account is created with
+password **`demo123`** and you're signed straight in (no admin step needed).
+
 ## The real roster (from your org chart)
 | Name | Department | Position | Role |
 |---|---|---|---|
