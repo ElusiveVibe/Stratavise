@@ -3,7 +3,7 @@
    Fully client-side (localStorage) demo build.
    ========================================================= */
 
-const DB_KEY = 'stratavise_db_v1';
+const DB_KEY = 'stratavise_db_v2';
 const SESSION_KEY = 'stratavise_session_v1';
 const THEME_KEY = 'stratavise_theme';
 
@@ -20,14 +20,33 @@ function deptLabel(key) { return deptMeta(key).label; }
 function getCriteria() { return getDB().criteria; }
 function getRatingScale() { return getDB().ratingScale; }
 function getRewards() { return getDB().rewards; }
+function getBenefits() { return getDB().benefits || []; }
+// A criterion's questions; criteria created by the admin without questions get one generic question.
+function criterionQuestions(c) {
+  if (c.questions && c.questions.length) return c.questions;
+  return [{ id: c.id + 'q1', en: 'The employee performs well in ' + c.name + '.', tl: '' }];
+}
 
 const RATING_LABELS = [
-  { v: 5, label: '5 - Outstanding' },
-  { v: 4, label: '4 - Very Good' },
-  { v: 3, label: '3 - Good' },
-  { v: 2, label: '2 - Satisfactory' },
-  { v: 1, label: '1 - Needs Improvement' }
+  { v: 5, en: 'Always', tl: 'Palagi' },
+  { v: 4, en: 'Usually', tl: 'Madalas' },
+  { v: 3, en: 'Sometimes', tl: 'Paminsan-minsan' },
+  { v: 2, en: 'Seldom', tl: 'Bihira' },
+  { v: 1, en: 'Never', tl: 'Hindi Kailanman' }
 ];
+
+function esc(str) {
+  return String(str == null ? '' : str).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+}
+// 4.0 -> "4", 4.4 -> "4.4"
+function fmtNum(n) { return String(Math.round(Number(n) * 10) / 10); }
+function wrapLabel(name, max) {
+  const words = String(name).split(' '); const lines = []; let cur = '';
+  words.forEach(w => { if ((cur + ' ' + w).trim().length > max && cur) { lines.push(cur); cur = w; } else cur = (cur + ' ' + w).trim(); });
+  if (cur) lines.push(cur);
+  return lines;
+}
+function samePeriod(ts, ref) { const a = new Date(ts), b = new Date(ref || Date.now()); return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth(); }
 
 function levelForScore(score) {
   const scale = getRatingScale();
@@ -48,8 +67,8 @@ function computeEvaluation(criteria, ratings) {
 
 /* ---------------------- Seed data ---------------------- */
 function seedDB() {
-  // Real roster from the org chart. Departments/criteria are editable later by the
-  // Administrator, so this is just a sensible starting point, not a fixed structure.
+  // Roster from the org chart + formal pictures. Everything below is editable later by the
+  // Administrator, so this is just the starting point, not a fixed structure.
   const departments = [
     { key: 'operations', label: 'Operations', icon: '⚙️', color: 'from-indigo-500 to-blue-600' },
     { key: 'hr', label: 'HR', icon: '👥', color: 'from-emerald-500 to-teal-600' },
@@ -58,26 +77,53 @@ function seedDB() {
     { key: 'sales', label: 'Sales', icon: '📈', color: 'from-amber-500 to-orange-600' }
   ];
 
+  // Supervisors: Sam Jean and Kayzelle. Everyone else is an employee.
   const employees = [
     { id: 'u_kayzelle', name: 'Kayzelle D. Refamonte', dept: 'operations', role: 'supervisor', jobTitle: 'Operations Manager' },
-    { id: 'u_celine', name: 'Celine Q. Amolador', dept: 'hr', role: 'supervisor', jobTitle: 'HR Generalist' },
-    { id: 'u_hannah', name: 'Hannah Cate B. Baliuag', dept: 'finance', role: 'supervisor', jobTitle: 'Financial Officer' },
+    { id: 'u_celine', name: 'Celine Q. Amolador', dept: 'hr', role: 'employee', jobTitle: 'HR Generalist' },
+    { id: 'u_hannah', name: 'Hannah Cate B. Baliuag', dept: 'finance', role: 'employee', jobTitle: 'Finance Officer' },
     { id: 'u_samjean', name: 'Sam Jean N. Satam', dept: 'it', role: 'supervisor', jobTitle: 'Web Developer' },
     { id: 'u_joseph', name: 'Joseph Benedict L. Gerero', dept: 'it', role: 'employee', jobTitle: 'IT Support' },
-    { id: 'u_shaira', name: 'Shaira B. Sauquillo', dept: 'sales', role: 'supervisor', jobTitle: 'Sales Consultant' }
-    // The org chart named one person per role — add more teammates any time from
-    // Admin → Manage Employees so Leaderboard / Completion Tracker have more to show.
-  ].map(u => ({ ...u, password: 'demo123', avatar: null }));
+    { id: 'u_shaira', name: 'Shaira B. Sauquillo', dept: 'sales', role: 'employee', jobTitle: 'Sales Consultant' }
+  ].map(u => ({ ...u, password: 'demo123', avatar: 'assets/avatars/' + u.id + '.jpg' }));
 
+  // Weights + questions (English with Filipino translation) from the Evaluation Questions file.
   const criteria = [
-    { id: 'c1', name: 'Quality of Work', weight: 25 },
-    { id: 'c2', name: 'Productivity and Efficiency', weight: 20 },
-    { id: 'c3', name: 'Teamwork and Collaboration', weight: 15 },
-    { id: 'c4', name: 'Client/Internal Customer Service', weight: 15 },
-    { id: 'c5', name: 'Initiative and Problem Solving', weight: 10 },
-    { id: 'c6', name: 'Professional Behaviour and Ethics', weight: 10 },
-    { id: 'c7', name: 'Attendance and Reliability', weight: 5 }
-  ];
+    { id: 'c1', name: 'Quality of Work', weight: 25, questions: [
+      { en: 'The employee effectively adheres to established company guidelines and industry standards.', tl: 'Epektibong sumusunod ang empleyado sa itinatag na mga alituntunin ng kumpanya at mga pamantayan sa industriya.' },
+      { en: 'The employee’s work output is accurate and error-free.', tl: 'Tumpak at walang pagkakamali ang natatapos na trabaho ng empleyado.' },
+      { en: 'The employee consistently produces work that meets or exceeds quality expectations.', tl: 'Palaging nakakagawa ang empleyado ng trabahong naaayon o higit pa sa inaasahang kalidad.' },
+      { en: 'The employee pays close attention to details when completing tasks and responsibilities.', tl: 'Nagbibigay-pansin ang empleyado sa mga detalye sa pagtupad ng mga gawain at responsibilidad.' },
+      { en: 'The employee maintains high-quality work even under pressure or tight deadlines.', tl: 'Napapanatili ng empleyado ang mataas na kalidad ng trabaho kahit sa ilalim ng matinding presyon o mahigpit na deadline.' }
+    ] },
+    { id: 'c2', name: 'Productivity and Efficiency', weight: 20, questions: [
+      { en: 'The employee consistently meets or exceeds volume targets and production goals for their role.', tl: 'Palaging naaabot o nalalampasan ng empleyado ang itinakdang mithiin at mga layunin sa produksyon para sa kanyang tungkulin.' },
+      { en: 'The employee effectively prioritizes tasks to meet deadlines.', tl: 'Mahusay na inuuna ng empleyado ang mga gawain upang makasunod sa mga itinakdang oras.' },
+      { en: 'The employee efficiently completes assigned tasks within the expected timeframe.', tl: 'Mabilis at epektibong natatapos ng empleyado ang mga nakatalagang gawain sa loob ng inaasahang oras.' },
+      { en: 'The employee manages their workload well to maintain productivity throughout the work period.', tl: 'Mahusay na pinamamahalaan ng empleyado ang kanyang mga gawain upang mapanatili ang pagiging produktibo sa buong oras ng pagtatrabaho.' }
+    ] },
+    { id: 'c3', name: 'Teamwork and Collaboration', weight: 15, questions: [
+      { en: 'The employee works well with colleagues and supports team goals.', tl: 'Mahusay na nakikipagtulungan ang empleyado sa kanyang mga katrabaho at sumusuporta sa mga layunin ng grupo.' },
+      { en: 'The employee communicates clearly with team members and others.', tl: 'Malinaw makipag-usap ang empleyado sa mga kagrupo at sa iba.' },
+      { en: 'The employee is willing to assist colleagues and contribute to group success.', tl: 'Handang tumulong ang empleyado sa mga katrabaho at mag-ambag sa tagumpay ng grupo.' }
+    ] },
+    { id: 'c4', name: 'Client/Internal Customer Service', weight: 15, questions: [
+      { en: 'The employee effectively identifies and resolves client or internal customer concerns.', tl: 'Mahusay na natutukoy at nalulutas ng empleyado ang mga suliranin o hinaing ng kliyente o panloob na kustomer.' },
+      { en: 'The employee interacts professionally with clients or internal customers.', tl: 'Propesyonal ang pakikitungo ng empleyado sa mga kliyente o panloob na kustomer.' },
+      { en: 'The employee promptly responds to client or internal customer requests and inquiries.', tl: 'Mabilis na tumutugon ang empleyado sa mga kahilingan at katanungan ng kliyente o internal na kustomer.' }
+    ] },
+    { id: 'c5', name: 'Initiative and Problem Solving', weight: 10, questions: [
+      { en: 'The employee takes initiative in tasks and responsibilities without being asked.', tl: 'Kusang-loob na kumikilos ang empleyado sa mga gawain at responsibilidad kahit hindi inuutusan.' },
+      { en: 'The employee presents possible solutions when encountering unexpected problems.', tl: 'Nagbibigay ang empleyado ng mga posibleng solusyon kapag may mga hindi inaasahang suliranin.' }
+    ] },
+    { id: 'c6', name: 'Professional Behaviour and Ethics', weight: 10, questions: [
+      { en: 'The employee consistently follows company policies, safety protocols, and compliance guidelines.', tl: 'Palaging sumusunod ang empleyado sa mga patakaran ng kumpanya, mga protokol sa kaligtasan, at mga alituntunin sa pagsunod.' },
+      { en: 'The employee demonstrates honesty, professionalism, and ethical conduct in the workplace.', tl: 'Ipinapakita ng empleyado ang katapatan, propesyonalismo, at wastong asal sa lugar ng trabaho.' }
+    ] },
+    { id: 'c7', name: 'Attendance and Reliability', weight: 5, questions: [
+      { en: 'The employee consistently arrives on time for work, scheduled meetings, and shifts.', tl: 'Palaging pumapasok sa tamang oras ang empleyado para sa trabaho, mga nakatakdang pulong, at mga iskedyul ng tungkulin.' }
+    ] }
+  ].map(c => ({ ...c, questions: c.questions.map((q, i) => ({ id: c.id + 'q' + (i + 1), en: q.en, tl: q.tl })) }));
 
   const ratingScale = [
     { id: uid('rs'), min: 97, max: 100, label: 'Exceptional Performance' },
@@ -99,18 +145,85 @@ function seedDB() {
     { id: uid('rw'), level: 'Unsatisfactory', benefits: 'Performance Improvement Plan (PIP) and Monthly Coaching', desc: 'Performance falls below company standards and requires immediate improvement.' }
   ];
 
+  // "Benefits Description" table (from the Incentives Description screenshot).
+  const benefits = [
+    { id: uid('bd'), benefit: 'Performance Bonus', desc: 'Additional monetary reward based on performance results and company performance.' },
+    { id: uid('bd'), benefit: 'Performance Incentive', desc: 'One-time cash reward for above-average performance.' },
+    { id: uid('bd'), benefit: 'Additional Leave Credits', desc: 'Additional paid leave days granted as a reward for exceptional performance.' },
+    { id: uid('bd'), benefit: 'Leadership Training', desc: 'Specialized training for employees being prepared for higher positions.' },
+    { id: uid('bd'), benefit: 'Promotion Priority', desc: 'First consideration for available promotion opportunities.' },
+    { id: uid('bd'), benefit: 'Recognition Award', desc: 'Formal recognition through certificates, awards, or company events.' },
+    { id: uid('bd'), benefit: 'Company-Paid Training', desc: 'Professional development programs funded by the company.' },
+    { id: uid('bd'), benefit: 'Performance Improvement Plan (PIP)', desc: 'Structured action plan designed to improve employee performance within a specified period.' }
+  ];
+
   const admins = [
     { id: 'admin1', username: 'admin', password: 'admin123', displayName: 'Administrator' }
   ];
+
+  /* ---- Past appraisal history (drives Progress Tracker → All-time Evaluation) ----
+     Five past cycles per person on the dates the team asked for. The last cycle (Sept 25, 2026)
+     matches the Top Performers shown on the Home page: Celine 97, Hannah 95, Shaira 91. */
+  const cycleDates = [
+    new Date(2025, 8, 26, 10, 30), new Date(2025, 11, 26, 10, 30), new Date(2026, 2, 27, 10, 30),
+    new Date(2026, 5, 26, 10, 30), new Date(2026, 8, 25, 10, 30)
+  ]; // Sep 26 2025, Dec 26 2025, Mar 27 2026, Jun 26 2026, Sep 25 2026
+  const history = {
+    u_celine:   { scores: [88, 91, 93, 95, 97], shape: [1.2, 0.8, 1, 1.1, 0.9, 0.7, 1.3] },
+    u_hannah:   { scores: [86, 89, 91, 93, 95], shape: [0.9, 1.1, 1.2, 0.8, 1, 1.2, 0.8] },
+    u_shaira:   { scores: [80, 83, 86, 89, 91], shape: [1.1, 0.9, 0.8, 1.3, 1, 0.9, 1.1] },
+    u_kayzelle: { scores: [81, 83, 85, 87, 89], shape: [0.8, 1.2, 1.1, 1, 0.9, 1.1, 1] },
+    u_samjean:  { scores: [78, 81, 84, 85, 88], shape: [1, 1.2, 0.9, 0.8, 1.2, 1, 1.1] },
+    u_joseph:   { scores: [74, 78, 81, 83, 85], shape: [1.1, 1.1, 0.8, 1.2, 0.9, 1, 0.9] }
+  };
+  const evaluatorFor = (uid_, i) => {
+    const pool = ['u_kayzelle', 'u_samjean'].filter(x => x !== uid_);
+    return pool[i % pool.length];
+  };
+  const levelFrom = (score) => (ratingScale.find(t => score >= t.min && score <= t.max) || ratingScale[ratingScale.length - 1]).label;
+  const evaluations = [];
+  Object.keys(history).forEach(userId => {
+    const h = history[userId];
+    h.scores.forEach((target, i) => {
+      // spread the lost points across criteria (heavier criteria lose more), then back out each 1–5 rating
+      const lost = 100 - target;
+      const wsum = criteria.reduce((a, c, k) => a + c.weight * h.shape[k], 0);
+      const ratings = {};
+      criteria.forEach((c, k) => {
+        const d = lost * c.weight * h.shape[k] / wsum;
+        ratings[c.id] = Math.round((5 - d * 5 / c.weight) * 1000) / 1000;
+      });
+      const finalScore = Math.round(criteria.reduce((a, c) => a + (ratings[c.id] / 5) * c.weight, 0) * 10) / 10;
+      const dt = cycleDates[i];
+      evaluations.push({
+        id: uid('ev'), employeeId: userId, evaluatorId: evaluatorFor(userId, i), ts: dt.getTime(),
+        date: dt.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: '2-digit' }),
+        time: dt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+        ratings, comment: '', finalScore, level: levelFrom(finalScore)
+      });
+    });
+  });
+
+  // Home page → Top Performers (fixed announcement for the closed period)
+  const topPerformers = {
+    period: 'September 2026',
+    entries: [
+      { userId: 'u_celine', score: 97, quote: '“This recognition is a reminder that dedication, consistency, and the willingness to improve can turn everyday efforts into meaningful achievements. I’m grateful for every challenge that pushed me beyond my comfort zone, every person who supported me, and every experience that helped me grow both personally and professionally. This achievement inspires me to continue giving my best, even when the work becomes challenging. More than an award, I see this recognition as motivation to keep learning, stay committed, and continue striving for excellence in everything I do.”' },
+      { userId: 'u_hannah', score: 95, quote: '“Honestly, I’m really grateful and happy to receive this Top Performer Award. I didn’t expect to be recognized like this, so it really means a lot to me. All the hard work, effort, and even the stressful days definitely feel worth it now. Success does really start with consistency.\n\nI also want to thank my teammates, supervisors, and everyone who supported me along the way. I couldn’t have done this without you guys. This award motivates me to keep learning, keep improving, and of course, keep doing my best.\n\nThank you so much for this recognition. I’m really happy and proud to be part of this team!”' },
+      { userId: 'u_shaira', score: 91, quote: '“Being recognized as a top performer means the world to me, and I am incredibly grateful for the trust, guidance, and support you’ve given me. This achievement is a huge motivation, and I am fully committed to pushing boundaries, learning more, and delivering even better results moving forward. Maraming salamat po sa tiwala at suporta! This is just the beginning – Patuloy tayong magsisikap at babawi nang mas matindi para sa susunod na chapter natin! Let’s keep growing together!”' }
+    ]
+  };
 
   return {
     departments,
     criteria,
     ratingScale,
     rewards,
+    benefits,
+    topPerformers,
     admins,
     users: employees,
-    evaluations: [],
+    evaluations,
     feedback: []
   };
 }
@@ -207,16 +320,18 @@ function closeModal() { const m = document.getElementById('modalRoot'); if (m) m
 
 function avatarHtml(user, size) {
   size = size || 10;
+  const px = size * 4; // same scale as Tailwind's w-10 = 40px
+  const box = `width:${px}px;height:${px}px;min-width:${px}px;`;
   if (user && user.avatar) {
-    return `<img src="${user.avatar}" class="w-${size} h-${size} rounded-full object-cover" />`;
+    return `<img src="${esc(user.avatar)}" alt="${esc(user.name)}" style="${box}" class="rounded-full object-cover object-top" />`;
   }
-  return `<div class="w-${size} h-${size} rounded-full bg-gradient-to-br from-emerald-400 to-blue-500 text-white flex items-center justify-center font-bold text-sm">${user ? initials(user.name) : '?'}</div>`;
+  return `<div style="${box}font-size:${Math.max(11, Math.round(px * 0.34))}px" class="rounded-full bg-gradient-to-br from-emerald-400 to-blue-500 text-white flex items-center justify-center font-bold">${user ? esc(initials(user.name)) : '?'}</div>`;
 }
 
 function navItems(role) {
   const base = [
     { key: 'home', label: 'Home Page', icon: '🏠' },
-    { key: 'incentives', label: 'Incentives Description', icon: '🎁' },
+    { key: 'incentives', label: 'Performance and Rewards', icon: '🎁' },
     { key: 'evaluate', label: 'Evaluate', icon: '📝' },
     { key: 'progress', label: 'Progress Tracker', icon: '📈' }
   ];
@@ -256,8 +371,8 @@ function sidebarShell(activeKey, innerHtml) {
     </aside>
     <main class="flex-1 min-w-0 p-6 overflow-x-hidden">
       <div class="flex items-center justify-between mb-5">
-        <div class="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-bold text-lg">
-          <span>📈</span><span>stratavise</span>
+        <div class="flex items-center gap-2 font-bold text-lg">
+          ${brandHtml()}
         </div>
       </div>
       ${innerHtml}
@@ -265,6 +380,10 @@ function sidebarShell(activeKey, innerHtml) {
   </div>
   <div id="modalRoot"></div>
   `;
+}
+
+function brandHtml(suffix) {
+  return `<span class="inline-flex items-center gap-2"><span class="bg-white rounded-lg p-1 shadow-sm ring-1 ring-slate-200 inline-flex"><img src="assets/logo-s.png" alt="Stratavise logo" class="h-7 w-auto" /></span><span class="text-[#1b2a6b] dark:text-white tracking-tight">stratavise</span>${suffix || ''}</span>`;
 }
 
 function handleLogout() {
@@ -278,8 +397,9 @@ function authShell(innerHtml) {
   appRoot().innerHTML = `
   <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-500 via-teal-500 to-blue-600 p-4">
     <div class="w-full max-w-2xl bg-white dark:bg-slate-800 rounded-2xl shadow-2xl overflow-hidden">
-      <div class="px-6 py-4 border-b border-slate-100 dark:border-slate-700 flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-bold text-lg">
-        <span>📈</span><span>sign in with stratavise</span>
+      <div class="px-6 py-3 border-b border-slate-100 dark:border-slate-700 flex items-center gap-3 font-bold text-lg">
+        <span class="bg-white rounded-xl p-1.5 shadow-sm ring-1 ring-slate-200 inline-flex"><img src="assets/logo-s.png" alt="Stratavise logo" class="h-10 w-auto" /></span>
+        <span class="text-[#1b2a6b] dark:text-white tracking-tight">sign in with stratavise</span>
       </div>
       <div class="p-8">${innerHtml}</div>
     </div>
@@ -288,16 +408,17 @@ function authShell(innerHtml) {
 
 function renderLoginDept() {
   _loginWizard = { dept: null, role: null };
+  // Always 3 per row (the last row is centred), including on phones.
   const cards = getDepartments().map(meta => `
-    <button onclick="location.hash='#/login/position/${meta.key}'" class="flex flex-col items-center gap-3 border-2 border-slate-200 dark:border-slate-600 hover:border-emerald-400 dark:hover:border-emerald-400 rounded-xl p-6 transition group">
-      <div class="w-16 h-16 rounded-xl bg-gradient-to-br ${meta.color} flex items-center justify-center text-3xl">${meta.icon}</div>
-      <span class="font-semibold text-slate-700 dark:text-slate-200 group-hover:text-emerald-600 dark:group-hover:text-emerald-400">${meta.label}</span>
+    <button onclick="location.hash='#/login/position/${meta.key}'" style="width: calc((100% - 2rem) / 3)" class="flex flex-col items-center gap-2 sm:gap-3 border-2 border-slate-200 dark:border-slate-600 hover:border-emerald-400 dark:hover:border-emerald-400 rounded-xl p-3 sm:p-6 transition group">
+      <div class="w-12 h-12 sm:w-16 sm:h-16 rounded-xl bg-gradient-to-br ${meta.color} flex items-center justify-center text-2xl sm:text-3xl">${meta.icon}</div>
+      <span class="font-semibold text-sm sm:text-base text-center text-slate-700 dark:text-slate-200 group-hover:text-emerald-600 dark:group-hover:text-emerald-400">${esc(meta.label)}</span>
     </button>`).join('');
 
   authShell(`
     <h1 class="text-2xl font-bold text-slate-800 dark:text-slate-100 text-center mb-1">Choose your department</h1>
     <p class="text-slate-400 text-center mb-8">to continue to evaluate</p>
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">${cards}</div>
+    <div class="flex flex-wrap justify-center gap-4">${cards}</div>
     <div class="text-center mt-6">
       <button onclick="location.hash='#/login/register'" class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold px-5 py-2.5 rounded-lg">+ New Employee? Create an Account</button>
     </div>
@@ -511,58 +632,65 @@ function latestEvalFor(db, employeeId) {
   return evs.slice().sort((a, b) => b.ts - a.ts)[0];
 }
 
+// Gold / silver / bronze styling for the Top 3 cards on the Home page
+const TOP_TIERS = [
+  { label: 'TOP 1', text: '#b8860b', border: '#d4af37', tint: 'rgba(212,175,55,0.10)' },
+  { label: 'TOP 2', text: '#7d828a', border: '#a8adb5', tint: 'rgba(168,173,181,0.12)' },
+  { label: 'TOP 3', text: '#8a5a2b', border: '#b0773c', tint: 'rgba(176,119,60,0.10)' }
+];
+
+function topPerformersHtml(db) {
+  const tp = db.topPerformers;
+  if (!tp || !tp.entries || !tp.entries.length) {
+    return `<p class="text-slate-400 text-sm text-center py-6">No top performers announced yet.</p>`;
+  }
+  const cards = tp.entries.map((ent, i) => {
+    const u = db.users.find(x => x.id === ent.userId); if (!u) return '';
+    const t = TOP_TIERS[i] || TOP_TIERS[2];
+    return `
+    <div class="flex flex-col sm:flex-row gap-3 mb-4">
+      <div class="sm:w-44 shrink-0 rounded-lg border-2 bg-white dark:bg-slate-800 py-3 px-2 text-center flex flex-col items-center" style="border-color:${t.border}; background-image: linear-gradient(${t.tint}, ${t.tint});">
+        <p class="text-xl font-extrabold tracking-wide" style="color:${t.text}">${t.label}</p>
+        <div class="my-2 rounded-full border-2 p-0.5" style="border-color:${t.border}">${avatarHtml(u, 20)}</div>
+        <p class="text-xl font-extrabold text-slate-800 dark:text-slate-100 leading-none">${ent.score}%</p>
+        <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">${esc(levelForScore(ent.score))}</p>
+      </div>
+      <div class="flex-1 min-w-0 rounded-lg border-2 bg-white dark:bg-slate-800 p-4" style="border-color:${t.border}">
+        <p class="font-bold text-slate-800 dark:text-slate-100 text-sm mb-2">${esc(u.name)} &ndash; ${esc(u.jobTitle)}</p>
+        <p class="text-sm italic text-slate-600 dark:text-slate-300 leading-relaxed whitespace-pre-line">${esc(ent.quote)}</p>
+      </div>
+    </div>`;
+  }).join('');
+  return cards;
+}
+
 function renderHome() {
   const user = currentUser(); if (!user) return;
   const db = getDB();
   const monthLabel = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-
-  // Top employees: highest latest-eval score, company-wide
-  const scored = db.users
-    .filter(u => u.role === 'employee')
-    .map(u => ({ user: u, ev: latestEvalFor(db, u.id) }))
-    .filter(x => x.ev)
-    .sort((a, b) => b.ev.finalScore - a.ev.finalScore)
-    .slice(0, 3);
-
-  const quotes = [
-    '"Excellence is not a skill, it\u2019s an attitude." — keep showing up.',
-    '"Small steps every day lead to big results."',
-    '"Great teams are built one honest evaluation at a time."'
-  ];
-  const quote = quotes[new Date().getDate() % quotes.length];
-
-  const topCards = scored.map(({ user: u, ev }) => `
-    <div class="bg-white dark:bg-slate-800 rounded-xl card-shadow p-4 flex flex-col items-center text-center">
-      ${avatarHtml(u, 14)}
-      <p class="font-semibold text-slate-800 dark:text-slate-100 text-sm mt-2">${u.name}</p>
-      <p class="text-xs text-slate-400">${deptLabel(u.dept)} &middot; ${u.jobTitle}</p>
-      <span class="mt-2 text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300">${ev.finalScore}% &middot; ${ev.level}</span>
-    </div>`).join('') || `<p class="text-slate-400 text-sm col-span-full text-center py-6">No evaluations recorded yet this period.</p>`;
+  const tpPeriod = (db.topPerformers && db.topPerformers.period) || '';
 
   sidebarShell('home', `
     <div class="grid lg:grid-cols-3 gap-5">
       <div class="lg:col-span-2">
         <div class="bg-white dark:bg-slate-800 rounded-xl card-shadow p-5 mb-5">
-          <h2 class="font-bold text-slate-800 dark:text-slate-100 mb-1">Welcome back, ${user.name.split(' ')[0]} 👋</h2>
-          <p class="text-sm text-slate-400">${deptLabel(user.dept)} Department &middot; ${user.jobTitle}</p>
+          <h2 class="font-bold text-slate-800 dark:text-slate-100 mb-1">Welcome back, ${esc(user.name.split(' ')[0])} 👋</h2>
+          <p class="text-sm text-slate-400">${esc(deptLabel(user.dept))} Department &middot; ${esc(user.jobTitle)}</p>
         </div>
-        <h3 class="font-semibold text-slate-600 dark:text-slate-300 text-sm mb-3">TOP EMPLOYEES FOR ${monthLabel.toUpperCase()}</h3>
-        <div class="grid sm:grid-cols-3 gap-4 mb-5">${topCards}</div>
-        <div class="bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl p-5 text-white">
-          <p class="text-sm italic">${quote}</p>
-        </div>
+        <h3 class="font-bold text-slate-800 dark:text-slate-100 text-sm text-center tracking-wide mb-4">TOP PERFORMERS OF ${esc(tpPeriod.toUpperCase())}</h3>
+        ${topPerformersHtml(db)}
       </div>
       <div class="bg-white dark:bg-slate-800 rounded-xl card-shadow p-5 h-fit">
         <h3 class="font-bold text-slate-800 dark:text-slate-100 mb-2">📋 Performance Appraisal</h3>
-        <p class="text-sm text-slate-500 dark:text-slate-400 mb-4">It is conducted for <strong class="text-slate-700 dark:text-slate-200">${monthLabel}</strong>, evaluating staff against the company's 7 core performance criteria — quality, productivity, teamwork, service, initiative, conduct, and attendance.</p>
-        <button onclick="location.hash='#/incentives'" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold py-2 rounded-lg">See Incentives Description for more info</button>
-        ${user.role === 'supervisor' ? `<button onclick="location.hash='#/evaluate'" class="w-full mt-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 text-sm font-semibold py-2 rounded-lg">Go to Evaluate</button>` : ''}
+        <p class="text-sm text-slate-500 dark:text-slate-400 mb-4">It is conducted for <strong class="text-slate-700 dark:text-slate-200">${monthLabel}</strong>, evaluating staff against the company's ${getCriteria().length} core performance criteria — quality, productivity, teamwork, service, initiative, conduct, and attendance.</p>
+        <button onclick="location.hash='#/incentives'" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold py-2 rounded-lg">See Performance and Rewards for more info</button>
+        <button onclick="location.hash='#/evaluate'" class="w-full mt-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 text-sm font-semibold py-2 rounded-lg">Go to Evaluate</button>
       </div>
     </div>
   `);
 }
 
-/* ---------------------- INCENTIVES DESCRIPTION ---------------------- */
+/* ---------------------- PERFORMANCE AND REWARDS (formerly Incentives Description) ---------------------- */
 function renderIncentives() {
   const user = currentUser(); if (!user) return;
   const criteria = getCriteria(), ratingScale = getRatingScale(), rewards = getRewards();
@@ -574,16 +702,23 @@ function renderIncentives() {
 
   const rewardRows = rewards.map(r => `
     <tr class="border-b last:border-0 border-slate-100 dark:border-slate-700 align-top">
-      <td class="py-3 pr-3 font-semibold text-slate-700 dark:text-slate-200 whitespace-nowrap">${r.level}</td>
-      <td class="py-3 pr-3 text-slate-600 dark:text-slate-300">${r.benefits}</td>
-      <td class="py-3 text-slate-500 dark:text-slate-400">${r.desc}</td>
+      <td class="py-3 pr-3 font-semibold text-slate-700 dark:text-slate-200 whitespace-nowrap">${esc(r.level)}</td>
+      <td class="py-3 pr-3 text-slate-600 dark:text-slate-300">${esc(r.benefits)}</td>
+      <td class="py-3 text-slate-500 dark:text-slate-400">${esc(r.desc)}</td>
+    </tr>`).join('');
+
+  const benefitRows = getBenefits().map(b => `
+    <tr class="border-b last:border-0 border-slate-100 dark:border-slate-700 align-top">
+      <td class="py-3 pr-3 font-semibold text-slate-700 dark:text-slate-200 whitespace-nowrap">${esc(b.benefit)}</td>
+      <td class="py-3 text-slate-600 dark:text-slate-300">${esc(b.desc)}</td>
     </tr>`).join('');
 
   sidebarShell('incentives', `
-    <h1 class="text-xl font-bold text-slate-800 dark:text-slate-100 mb-5">🎁 Incentives Description</h1>
+    <h1 class="text-xl font-bold text-slate-800 dark:text-slate-100 mb-5">🎁 Performance and Rewards</h1>
 
     <div class="bg-white dark:bg-slate-800 rounded-xl card-shadow p-5 mb-5">
-      <h3 class="font-semibold text-slate-700 dark:text-slate-200 mb-3">Performance Criteria</h3>
+      <h3 class="font-semibold text-slate-700 dark:text-slate-200 mb-1">Performance Criteria</h3>
+      <p class="text-sm text-slate-500 dark:text-slate-400 mb-3">Employees shall be evaluated using the following criteria:</p>
       <div class="grid lg:grid-cols-2 gap-5 items-start">
         <table class="w-full text-sm">
           <thead><tr class="text-left text-slate-400 border-b border-slate-200 dark:border-slate-700"><th class="py-2">Criteria</th><th class="py-2 text-right">Weight</th></tr></thead>
@@ -597,7 +732,8 @@ function renderIncentives() {
     </div>
 
     <div class="bg-white dark:bg-slate-800 rounded-xl card-shadow p-5 mb-5">
-      <h3 class="font-semibold text-slate-700 dark:text-slate-200 mb-3">Performance Rating Scale</h3>
+      <h3 class="font-semibold text-slate-700 dark:text-slate-200 mb-1">Performance Rating Scale</h3>
+      <p class="text-sm text-slate-500 dark:text-slate-400 mb-3">The final performance score shall be converted into a performance rating. Each rating level reflects the employee's overall performance and serves as the basis for rewards, development opportunities, and performance improvement initiatives.</p>
       <div class="grid lg:grid-cols-2 gap-5 items-start">
         <table class="w-full text-sm">
           <thead><tr class="text-left text-slate-400 border-b border-slate-200 dark:border-slate-700"><th class="py-2">Final Score</th><th class="py-2">Performance Level</th></tr></thead>
@@ -610,11 +746,21 @@ function renderIncentives() {
       </div>
     </div>
 
-    <div class="bg-white dark:bg-slate-800 rounded-xl card-shadow p-5 overflow-x-auto">
-      <h3 class="font-semibold text-slate-700 dark:text-slate-200 mb-3">Rewards &amp; Benefits</h3>
+    <div class="bg-white dark:bg-slate-800 rounded-xl card-shadow p-5 mb-5 overflow-x-auto">
+      <h3 class="font-semibold text-slate-700 dark:text-slate-200 mb-1">Rewards and Benefits</h3>
+      <p class="text-sm text-slate-500 dark:text-slate-400 mb-3">Employees who achieve higher performance ratings shall receive benefits based on their overall evaluation results.</p>
       <table class="w-full text-sm min-w-[600px]">
         <thead><tr class="text-left text-slate-400 border-b border-slate-200 dark:border-slate-700"><th class="py-2">Performance Level</th><th class="py-2">Benefits Granted</th><th class="py-2">Description</th></tr></thead>
         <tbody>${rewardRows}</tbody>
+      </table>
+    </div>
+
+    <div class="bg-white dark:bg-slate-800 rounded-xl card-shadow p-5 overflow-x-auto">
+      <h3 class="font-semibold text-slate-700 dark:text-slate-200 mb-1">Benefits Description</h3>
+      <p class="text-sm text-slate-500 dark:text-slate-400 mb-3">This table describes the benefits an employee can receive based on their performance.</p>
+      <table class="w-full text-sm min-w-[500px]">
+        <thead><tr class="text-left text-slate-400 border-b border-slate-200 dark:border-slate-700"><th class="py-2">Benefit</th><th class="py-2">Description</th></tr></thead>
+        <tbody>${benefitRows}</tbody>
       </table>
     </div>
   `);
@@ -664,23 +810,26 @@ let _evalSearch = '';
 function renderEvaluateChoose() {
   const user = currentUser(); if (!user) return;
   const db = getDB();
-  // Supervisors evaluate employees in their own department; employees can peer-evaluate colleagues in their dept
-  const pool = db.users.filter(u => u.dept === user.dept && u.id !== user.id);
+  // Every other member of the team can be evaluated (the roster has one person per department).
+  const pool = db.users.filter(u => u.id !== user.id);
   const filtered = pool.filter(u => !_evalSearch || u.name.toLowerCase().includes(_evalSearch.toLowerCase()));
+  // Who has this person already evaluated during the current period?
+  const doneIds = new Set(db.evaluations.filter(e => e.evaluatorId === user.id && samePeriod(e.ts)).map(e => e.employeeId));
 
   const cards = filtered.map(u => `
-    <button onclick="location.hash='#/evaluate/${u.id}'" class="text-left bg-white dark:bg-slate-800 rounded-xl card-shadow p-4 flex items-center gap-3 hover:ring-2 hover:ring-emerald-400 transition">
-      ${avatarHtml(u, 12)}
-      <div class="min-w-0">
-        <p class="font-semibold text-slate-800 dark:text-slate-100 text-sm truncate">${u.name}</p>
-        <p class="text-xs text-slate-400 truncate">${deptLabel(u.dept)} &middot; ${u.jobTitle}</p>
+    <button onclick="location.hash='#/evaluate/${u.id}'" class="text-left bg-white dark:bg-slate-800 rounded-lg border-2 border-emerald-500 p-3 flex items-center gap-3 hover:shadow-lg hover:-translate-y-0.5 transition">
+      ${avatarHtml(u, 16)}
+      <div class="min-w-0 flex-1">
+        <p class="font-bold text-slate-800 dark:text-slate-100 text-sm truncate">${esc(u.name)}</p>
+        <p class="text-xs text-slate-500 dark:text-slate-400 truncate">${esc(deptLabel(u.dept))} - ${esc(u.jobTitle)}</p>
+        ${doneIds.has(u.id) ? `<span class="inline-block mt-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300">✓ Evaluated this month</span>` : ''}
       </div>
     </button>`).join('') || `<p class="text-slate-400 text-sm col-span-full text-center py-10">No one to evaluate here.</p>`;
 
   sidebarShell('evaluate', `
     <h1 class="text-xl font-bold text-slate-800 dark:text-slate-100 mb-4">Choose who to evaluate</h1>
     <div class="relative max-w-md mb-5">
-      <input id="evalSearchInput" value="${_evalSearch}" placeholder="Search Bar" class="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white rounded-lg px-3 py-2 pr-9" />
+      <input id="evalSearchInput" value="${esc(_evalSearch)}" placeholder="Search Bar" class="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white rounded-lg px-3 py-2 pr-9" />
       <span class="absolute right-3 top-2.5 text-slate-400">🔍</span>
     </div>
     <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">${cards}</div>
@@ -699,52 +848,91 @@ function renderEvaluateForm(employeeId) {
   const user = currentUser(); if (!user) return;
   const db = getDB();
   const emp = db.users.find(u => u.id === employeeId);
-  if (!emp) { location.hash = '#/evaluate'; return; }
+  if (!emp || emp.id === user.id) { location.hash = '#/evaluate'; return; }
   const criteria = getCriteria();
+  const totalQuestions = criteria.reduce((n, c) => n + criterionQuestions(c).length, 0);
 
-  const sections = criteria.map((c, idx) => `
+  const sections = criteria.map(c => `
     <div class="bg-white dark:bg-slate-800 rounded-xl card-shadow mb-4 overflow-hidden">
-      <div class="bg-gradient-to-r from-emerald-500 to-teal-600 text-white px-5 py-3 font-semibold">${c.name} <span class="text-xs font-normal opacity-80">(${c.weight}% weight)</span></div>
-      <div class="p-5">
-        <p class="text-sm text-slate-600 dark:text-slate-300 mb-3">1. Employee is ${c.name.toLowerCase().includes('attendance') ? 'punctual and reliable' : c.name.toLowerCase().includes('teamwork') ? 'collaborative with the team' : c.name.toLowerCase().includes('initiative') ? 'proactive in solving problems' : c.name.toLowerCase().includes('professional') ? 'professional and ethical' : c.name.toLowerCase().includes('client') ? 'responsive to client/internal needs' : 'performing in this area'}...</p>
-        <div class="space-y-1">
-          ${RATING_LABELS.map(r => `
-            <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200 cursor-pointer py-1">
-              <input type="radio" name="rate_${c.id}" value="${r.v}" class="rateRadio accent-emerald-600" data-cid="${c.id}" />
-              ${r.label}
-            </label>`).join('')}
-        </div>
+      <div class="bg-gradient-to-r from-emerald-500 to-teal-600 text-white px-5 py-3 font-semibold">${esc(c.name)} <span class="text-xs font-normal opacity-80">(${c.weight}% weight)</span></div>
+      <div class="p-5 space-y-6">
+        ${criterionQuestions(c).map((q, i) => `
+          <div id="qwrap_${q.id}">
+            <p class="text-sm font-medium text-slate-800 dark:text-slate-100">${i + 1}. ${esc(q.en)}</p>
+            ${q.tl ? `<p class="text-sm italic text-slate-500 dark:text-slate-400 mb-3">(${esc(q.tl)})</p>` : '<div class="mb-3"></div>'}
+            <div class="grid grid-cols-5 gap-1.5 sm:gap-2">
+              ${RATING_LABELS.map(r => `
+                <label class="cursor-pointer block">
+                  <input type="radio" name="q_${q.id}" value="${r.v}" data-cid="${c.id}" data-qid="${q.id}" class="rateRadio peer sr-only" />
+                  <div class="h-full text-center border-2 border-slate-200 dark:border-slate-600 rounded-lg px-1 py-2 hover:border-emerald-300 peer-checked:border-emerald-500 peer-checked:bg-emerald-50 dark:peer-checked:bg-emerald-900/40 peer-focus-visible:ring-2 peer-focus-visible:ring-emerald-400 transition">
+                    <div class="text-base font-bold text-slate-700 dark:text-slate-100">${r.v}</div>
+                    <div class="text-[11px] leading-tight font-medium text-slate-600 dark:text-slate-300">${r.en}</div>
+                    <div class="text-[10px] leading-tight italic text-slate-400">(${r.tl})</div>
+                  </div>
+                </label>`).join('')}
+            </div>
+          </div>`).join('')}
       </div>
     </div>`).join('');
 
   sidebarShell('evaluate', `
     <button onclick="location.hash='#/evaluate'" class="text-sm text-slate-400 hover:text-slate-600 mb-4">&larr; Back</button>
     <div class="flex items-center gap-3 mb-5">
-      ${avatarHtml(emp, 12)}
+      ${avatarHtml(emp, 16)}
       <div>
-        <h1 class="text-xl font-bold text-slate-800 dark:text-slate-100">Evaluating ${emp.name}</h1>
-        <p class="text-sm text-slate-400">${deptLabel(emp.dept)} &middot; ${emp.jobTitle}</p>
+        <h1 class="text-xl font-bold text-slate-800 dark:text-slate-100">Evaluating ${esc(emp.name)}</h1>
+        <p class="text-sm text-slate-400">${esc(deptLabel(emp.dept))} - ${esc(emp.jobTitle)}</p>
       </div>
     </div>
-    <div class="max-w-2xl">
+    <div class="max-w-3xl">
+      <div class="bg-white dark:bg-slate-800 rounded-xl card-shadow p-4 mb-4">
+        <p class="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2">RATING SCALE</p>
+        <div class="flex flex-wrap gap-x-5 gap-y-1 text-sm text-slate-700 dark:text-slate-200">
+          ${RATING_LABELS.map(r => `<span><strong>${r.v}</strong> – ${r.en} <em class="text-slate-400">(${r.tl})</em></span>`).join('')}
+        </div>
+      </div>
       ${sections}
-      <div class="flex justify-end gap-2 mt-4">
-        <button onclick="location.hash='#/evaluate'" class="px-4 py-2 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700">Cancel</button>
-        <button onclick="submitEvaluation('${emp.id}')" class="px-5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold">Submit Evaluation</button>
+      <div class="bg-white dark:bg-slate-800 rounded-xl card-shadow p-5 mb-4">
+        <label for="evalComment" class="block text-sm font-semibold text-slate-800 dark:text-slate-100 mb-2">Are there any additional comments you would like to provide?</label>
+        <textarea id="evalComment" rows="4" maxlength="1000" class="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg px-3 py-2"></textarea>
+        <p class="text-xs text-slate-400 mt-1">Optional.</p>
+      </div>
+      <div class="flex items-center justify-between gap-2 mt-4 flex-wrap">
+        <span id="evalProgress" class="text-sm text-slate-500 dark:text-slate-400">Answered 0 / ${totalQuestions}</span>
+        <div class="flex gap-2">
+          <button onclick="location.hash='#/evaluate'" class="px-4 py-2 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700">Cancel</button>
+          <button onclick="submitEvaluation('${emp.id}')" class="px-5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold">Submit Evaluation</button>
+        </div>
       </div>
     </div>
   `);
+
+  document.querySelectorAll('.rateRadio').forEach(r => r.addEventListener('change', () => {
+    document.getElementById('evalProgress').textContent = `Answered ${document.querySelectorAll('.rateRadio:checked').length} / ${totalQuestions}`;
+  }));
 }
 
 function submitEvaluation(employeeId) {
   const criteria = getCriteria();
-  const radios = document.querySelectorAll('.rateRadio:checked');
-  if (radios.length !== criteria.length) {
-    toast('Please rate every criterion before submitting', 'error');
+  const answers = {};
+  document.querySelectorAll('.rateRadio:checked').forEach(r => { answers[r.getAttribute('data-qid')] = Number(r.value); });
+
+  // every question must be answered
+  const missing = [];
+  criteria.forEach(c => criterionQuestions(c).forEach(q => { if (!answers[q.id]) missing.push(q.id); }));
+  if (missing.length) {
+    toast(`Please answer every question (${missing.length} left)`, 'error');
+    const el = document.getElementById('qwrap_' + missing[0]);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     return;
   }
+
+  // a criterion's rating (1–5) is the average of its question answers
   const ratings = {};
-  radios.forEach(r => { ratings[r.getAttribute('data-cid')] = Number(r.value); });
+  criteria.forEach(c => {
+    const qs = criterionQuestions(c);
+    ratings[c.id] = Math.round((qs.reduce((a, q) => a + answers[q.id], 0) / qs.length) * 1000) / 1000;
+  });
 
   const user = currentUser();
   const db = getDB();
@@ -756,7 +944,9 @@ function submitEvaluation(employeeId) {
     ts: Date.now(),
     date: nowDate(),
     time: nowTime(),
+    answers,
     ratings,
+    comment: document.getElementById('evalComment').value.trim(),
     finalScore,
     level
   };
@@ -798,6 +988,7 @@ function showEvalSuccessModal(record) {
       <p class="text-sm mb-4"><span class="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300 font-bold px-3 py-1 rounded-full">${record.finalScore}% &middot; ${record.level}</span></p>
       <p class="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2">Score breakdown by criteria</p>
       <canvas id="successPieCanvas" height="200"></canvas>
+      <p class="text-xs text-slate-400 mt-3">The Progress Tracker, Leaderboard and Completion Tracker now include this evaluation.</p>
       <button onclick="closeModal(); location.hash='#/evaluate'" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 rounded-lg mt-4">Back to Evaluate</button>
     </div>
   </div>`;
@@ -828,34 +1019,33 @@ function renderProgressTracker() {
   if (_progressTab === 'last') {
     const ev = myEvals[0];
     const rows = criteria.map(c => `
-      <tr class="border-b last:border-0 border-slate-100 dark:border-slate-700">
-        <td class="py-2 text-slate-700 dark:text-slate-200">${c.name}</td>
-        <td class="py-2 text-slate-700 dark:text-slate-200">${ev.ratings[c.id]}/5</td>
-        <td class="py-2 text-slate-700 dark:text-slate-200">${Math.round(((ev.ratings[c.id] / 5) * c.weight) * 10) / 10}%</td>
+      <tr class="border-b border-slate-100 dark:border-slate-700">
+        <td class="py-2 text-slate-700 dark:text-slate-200">${esc(c.name)}</td>
+        <td class="py-2 text-slate-700 dark:text-slate-200">${ev.ratings[c.id] == null ? '-' : fmtNum(ev.ratings[c.id]) + '/5'}</td>
+        <td class="py-2 text-slate-700 dark:text-slate-200">${ev.ratings[c.id] == null ? '-' : fmtNum((ev.ratings[c.id] / 5) * c.weight) + '%'}</td>
       </tr>`).join('');
 
     sidebarShell('progress', `
       <h1 class="text-xl font-bold text-slate-800 dark:text-slate-100 mb-4">📈 Progress Tracker</h1>
       ${tabs}
-      <p class="text-sm text-slate-400 mb-3">Date: ${ev.date}</p>
+      <p class="text-sm text-slate-500 dark:text-slate-400 mb-3">Date: <strong class="text-slate-700 dark:text-slate-200">${esc(ev.date)}</strong></p>
       <div class="grid lg:grid-cols-2 gap-5">
         <div class="bg-white dark:bg-slate-800 rounded-xl card-shadow p-5">
           <table class="w-full text-sm mb-4">
             <thead><tr class="text-left text-slate-400 border-b border-slate-200 dark:border-slate-700"><th class="py-2">Criteria</th><th class="py-2">Score</th><th class="py-2">Percentage</th></tr></thead>
-            <tbody>${rows}</tbody>
+            <tbody>${rows}
+              <tr><td class="py-2 font-bold text-slate-800 dark:text-slate-100">Overall</td><td></td><td class="py-2 font-bold text-slate-800 dark:text-slate-100">${ev.finalScore}%</td></tr>
+            </tbody>
           </table>
           <div class="bg-emerald-50 dark:bg-emerald-900/30 rounded-lg p-4 text-center">
             <span class="text-2xl font-bold text-emerald-700 dark:text-emerald-300">${ev.finalScore}%</span>
-            <p class="text-sm text-emerald-600 dark:text-emerald-400 font-semibold">${ev.level}</p>
+            <span class="text-emerald-700 dark:text-emerald-300 font-bold"> &ndash; </span>
+            <span class="text-lg text-emerald-600 dark:text-emerald-400 font-semibold">${esc(ev.level)}</span>
           </div>
         </div>
         <div class="bg-white dark:bg-slate-800 rounded-xl card-shadow p-5">
           <h3 class="text-sm font-semibold text-slate-500 dark:text-slate-400 mb-2">Performance Radar</h3>
-          <canvas id="radarChartCanvas" height="220"></canvas>
-        </div>
-        <div class="bg-white dark:bg-slate-800 rounded-xl card-shadow p-5 lg:col-span-2">
-          <h3 class="text-sm font-semibold text-slate-500 dark:text-slate-400 mb-2">Score Breakdown by Criteria</h3>
-          <div class="max-w-sm mx-auto"><canvas id="progressPieCanvas" height="220"></canvas></div>
+          <canvas id="radarChartCanvas" height="260"></canvas>
         </div>
       </div>
     `);
@@ -865,19 +1055,18 @@ function renderProgressTracker() {
     _radarChart = new Chart(ctx, {
       type: 'radar',
       data: {
-        labels: criteria.map(c => c.name),
-        datasets: [{ label: 'Rating (out of 5)', data: criteria.map(c => ev.ratings[c.id]), backgroundColor: 'rgba(16,185,129,0.25)', borderColor: '#10b981', pointBackgroundColor: '#10b981' }]
+        labels: criteria.map(c => wrapLabel(c.name + ' (' + c.weight + '%)', 18)),
+        datasets: [{ label: 'Rating (out of 5)', data: criteria.map(c => ev.ratings[c.id] == null ? 0 : Math.round(ev.ratings[c.id] * 100) / 100), backgroundColor: 'rgba(16,185,129,0.25)', borderColor: '#10b981', pointBackgroundColor: '#10b981' }]
       },
-      options: { scales: { r: { min: 0, max: 5, ticks: { stepSize: 1 } } }, plugins: { legend: { display: false } } }
+      options: { scales: { r: { min: 0, max: 5, ticks: { stepSize: 1, backdropColor: 'transparent' }, pointLabels: { font: { size: 11 } } } }, plugins: { legend: { display: false } } }
     });
-    drawCriteriaPie('progressPieCanvas', ev.ratings);
   } else {
     const historyCards = myEvals.map(ev => `
       <div class="bg-white dark:bg-slate-800 rounded-xl card-shadow p-4">
-        <p class="text-xs text-slate-400 mb-1">Date: ${ev.date}</p>
-        <p class="text-2xl font-bold text-slate-800 dark:text-slate-100">${ev.finalScore}%</p>
-        <p class="text-sm font-semibold text-emerald-600 dark:text-emerald-400 mb-2">${ev.level}</p>
-        ${criteria.map(c => `<p class="text-xs text-slate-500 dark:text-slate-400">${c.name.length > 20 ? c.name.slice(0, 20) + '…' : c.name} — ${Math.round(((ev.ratings[c.id] / 5) * c.weight) * 10) / 10}%</p>`).join('')}
+        <p class="text-xs text-slate-400 mb-1">Date: ${esc(ev.date)}</p>
+        <p class="text-3xl font-bold text-slate-800 dark:text-slate-100">${ev.finalScore}%</p>
+        <p class="text-sm font-semibold text-emerald-600 dark:text-emerald-400 mb-3">${esc(ev.level)}</p>
+        ${criteria.map(c => `<p class="text-xs text-slate-500 dark:text-slate-400 flex justify-between gap-2"><span class="truncate">${esc(c.name)}</span><span class="shrink-0 font-medium">${ev.ratings[c.id] == null ? '-' : fmtNum((ev.ratings[c.id] / 5) * c.weight) + '%'}</span></p>`).join('')}
       </div>`).join('');
 
     sidebarShell('progress', `
@@ -1026,26 +1215,30 @@ function changePassword() {
 /* ---------------------- LEADERBOARD (Supervisor) ---------------------- */
 let _leaderboardPie = null;
 
+// Company-wide ranking: each member's most recent evaluation, highest score first.
+function leaderboardData(db) {
+  return db.users
+    .map(u => ({ user: u, ev: latestEvalFor(db, u.id) }))
+    .filter(x => x.ev)
+    .sort((a, b) => b.ev.finalScore - a.ev.finalScore);
+}
+
 function renderLeaderboard() {
   const user = currentUser(); if (!user) return;
   if (user.role !== 'supervisor') { location.hash = '#/home'; return; }
   const db = getDB();
-
-  const ranked = db.users
-    .filter(u => u.dept === user.dept && u.role === 'employee')
-    .map(u => ({ user: u, ev: latestEvalFor(db, u.id) }))
-    .filter(x => x.ev)
-    .sort((a, b) => b.ev.finalScore - a.ev.finalScore);
+  const ranked = leaderboardData(db);
 
   const rows = ranked.map((x, idx) => `
     <tr class="border-b last:border-0 border-slate-100 dark:border-slate-700">
-      <td class="py-2 text-slate-700 dark:text-slate-200 font-semibold">${idx + 1}</td>
-      <td class="py-2 text-slate-700 dark:text-slate-200">${x.user.name}</td>
-      <td class="py-2 text-slate-500 dark:text-slate-400">${x.user.jobTitle}</td>
-      <td class="py-2 text-slate-700 dark:text-slate-200">${(x.ev.finalScore / 20).toFixed(1)}/5</td>
-      <td class="py-2 text-slate-700 dark:text-slate-200">${x.ev.finalScore}%</td>
-      <td class="py-2"><span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300">${x.ev.level}</span></td>
-    </tr>`).join('') || `<tr><td colspan="6" class="py-6 text-center text-slate-400">No evaluations yet in this department.</td></tr>`;
+      <td class="py-2 pr-3 text-slate-700 dark:text-slate-200 font-semibold">${idx + 1}</td>
+      <td class="py-2 pr-3"><div class="flex items-center gap-2 text-slate-700 dark:text-slate-200">${avatarHtml(x.user, 8)}<span>${esc(x.user.name)}</span></div></td>
+      <td class="py-2 pr-3 text-slate-500 dark:text-slate-400">${esc(deptLabel(x.user.dept))}</td>
+      <td class="py-2 pr-3 text-slate-500 dark:text-slate-400">${esc(x.user.jobTitle)}</td>
+      <td class="py-2 pr-3 text-slate-700 dark:text-slate-200">${(x.ev.finalScore / 20).toFixed(1)}/5</td>
+      <td class="py-2 pr-3 text-slate-700 dark:text-slate-200">${x.ev.finalScore}%</td>
+      <td class="py-2 pr-3"><span class="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300">${esc(x.ev.level)}</span></td>
+    </tr>`).join('') || `<tr><td colspan="7" class="py-6 text-center text-slate-400">No evaluations yet.</td></tr>`;
 
   // Distribution of performance levels
   const dist = {};
@@ -1056,17 +1249,18 @@ function renderLeaderboard() {
 
   sidebarShell('leaderboard', `
     <div class="flex items-center justify-between mb-5 flex-wrap gap-3">
-      <h1 class="text-xl font-bold text-slate-800 dark:text-slate-100">🏆 Leaderboard — ${deptLabel(user.dept)} Department</h1>
+      <h1 class="text-xl font-bold text-slate-800 dark:text-slate-100">🏆 Leaderboard &mdash; All Departments</h1>
       <div class="flex gap-2">
         <button onclick="exportLeaderboardExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold px-3 py-2 rounded-lg">⬇ Excel</button>
         <button onclick="exportLeaderboardPDF()" class="bg-red-500 hover:bg-red-600 text-white text-sm font-semibold px-3 py-2 rounded-lg">⬇ PDF</button>
       </div>
     </div>
+    <p class="text-xs text-slate-400 mb-4">Ranked by each member's most recent evaluation. It updates as soon as a new evaluation is submitted.</p>
     <div class="grid lg:grid-cols-3 gap-5">
       <div class="lg:col-span-2 bg-white dark:bg-slate-800 rounded-xl card-shadow p-4 overflow-x-auto">
-        <table class="w-full text-sm min-w-[500px]">
+        <table class="w-full text-sm min-w-[600px]">
           <thead><tr class="text-left text-slate-400 border-b border-slate-200 dark:border-slate-700">
-            <th class="py-2">Rank</th><th class="py-2">Name</th><th class="py-2">Position</th><th class="py-2">Score</th><th class="py-2">Percentage</th><th class="py-2">Performance Level</th>
+            <th class="py-2 pr-3">Rank</th><th class="py-2 pr-3">Name</th><th class="py-2 pr-3">Department</th><th class="py-2 pr-3">Position</th><th class="py-2 pr-3">Score</th><th class="py-2 pr-3">Percentage</th><th class="py-2 pr-3">Performance Level</th>
           </tr></thead>
           <tbody>${rows}</tbody>
         </table>
@@ -1090,37 +1284,29 @@ function renderLeaderboard() {
 }
 
 function exportLeaderboardExcel() {
-  const user = currentUser();
-  const db = getDB();
-  const ranked = db.users.filter(u => u.dept === user.dept && u.role === 'employee')
-    .map(u => ({ user: u, ev: latestEvalFor(db, u.id) })).filter(x => x.ev)
-    .sort((a, b) => b.ev.finalScore - a.ev.finalScore);
+  const ranked = leaderboardData(getDB());
   const data = ranked.map((x, idx) => ({
-    Rank: idx + 1, Name: x.user.name, Position: x.user.jobTitle,
+    Rank: idx + 1, Name: x.user.name, Department: deptLabel(x.user.dept), Position: x.user.jobTitle,
     Score: (x.ev.finalScore / 20).toFixed(1) + '/5', Percentage: x.ev.finalScore + '%', 'Performance Level': x.ev.level
   }));
   const ws = XLSX.utils.json_to_sheet(data);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Leaderboard');
-  XLSX.writeFile(wb, `leaderboard_${user.dept}.xlsx`);
+  XLSX.writeFile(wb, 'leaderboard.xlsx');
 }
 
 function exportLeaderboardPDF() {
-  const user = currentUser();
-  const db = getDB();
-  const ranked = db.users.filter(u => u.dept === user.dept && u.role === 'employee')
-    .map(u => ({ user: u, ev: latestEvalFor(db, u.id) })).filter(x => x.ev)
-    .sort((a, b) => b.ev.finalScore - a.ev.finalScore);
+  const ranked = leaderboardData(getDB());
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF();
   doc.setFontSize(14);
-  doc.text(`Leaderboard — ${user.dept} Department`, 14, 16);
+  doc.text('Leaderboard - All Departments', 14, 16);
   doc.autoTable({
     startY: 22,
-    head: [['Rank', 'Name', 'Position', 'Score', 'Percentage', 'Performance Level']],
-    body: ranked.map((x, idx) => [idx + 1, x.user.name, x.user.jobTitle, (x.ev.finalScore / 20).toFixed(1) + '/5', x.ev.finalScore + '%', x.ev.level])
+    head: [['Rank', 'Name', 'Department', 'Position', 'Score', 'Percentage', 'Performance Level']],
+    body: ranked.map((x, idx) => [idx + 1, x.user.name, deptLabel(x.user.dept), x.user.jobTitle, (x.ev.finalScore / 20).toFixed(1) + '/5', x.ev.finalScore + '%', x.ev.level])
   });
-  doc.save(`leaderboard_${user.dept}.pdf`);
+  doc.save('leaderboard.pdf');
 }
 
 /* ---------------------- COMPLETION TRACKER (Supervisor) ---------------------- */
@@ -1128,36 +1314,56 @@ function renderCompletionTracker() {
   const user = currentUser(); if (!user) return;
   if (user.role !== 'supervisor') { location.hash = '#/home'; return; }
   const db = getDB();
+  const periodLabel = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
-  const supervisors = db.users.filter(u => u.dept === user.dept && u.role === 'supervisor');
-  const employeeCount = db.users.filter(u => u.dept === user.dept && u.role === 'employee').length;
+  const supervisors = db.users.filter(u => u.role === 'supervisor');
+  const counts = { 'Completed': 0, 'Pending': 0, 'Not Yet Started': 0 };
+  const STATUS_STYLE = {
+    'Completed': 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300',
+    'Pending': 'bg-sky-100 text-sky-700 dark:bg-sky-900/50 dark:text-sky-300',
+    'Not Yet Started': 'bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300'
+  };
 
   const rows = supervisors.map(sup => {
-    const evaluatedIds = new Set(db.evaluations.filter(e => e.evaluatorId === sup.id).map(e => e.employeeId));
-    const count = evaluatedIds.size;
-    let status, colorClass;
-    if (count === 0) { status = 'Not Yet Started'; colorClass = 'bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300'; }
-    else if (count >= employeeCount && employeeCount > 0) { status = 'Completed'; colorClass = 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300'; }
-    else { status = 'Pending'; colorClass = 'bg-sky-100 text-sky-700 dark:bg-sky-900/50 dark:text-sky-300'; }
+    // Everyone else on the team should be evaluated by this supervisor once per period (calendar month)
+    const targets = db.users.filter(u => u.id !== sup.id);
+    const doneIds = new Set(db.evaluations.filter(e => e.evaluatorId === sup.id && samePeriod(e.ts)).map(e => e.employeeId));
+    const done = targets.filter(t => doneIds.has(t.id));
+    const left = targets.filter(t => !doneIds.has(t.id));
+    let status;
+    if (done.length === 0) status = 'Not Yet Started';
+    else if (left.length === 0) status = 'Completed';
+    else status = 'Pending';
+    counts[status]++;
+    const pct = targets.length ? Math.round((done.length / targets.length) * 100) : 0;
     return `
-      <tr class="border-b last:border-0 border-slate-100 dark:border-slate-700">
-        <td class="py-2 text-slate-700 dark:text-slate-200">${sup.name}</td>
-        <td class="py-2 text-slate-500 dark:text-slate-400">${sup.jobTitle}</td>
-        <td class="py-2 text-slate-700 dark:text-slate-200">${count}/${employeeCount}</td>
-        <td class="py-2"><span class="text-xs font-semibold px-2 py-0.5 rounded-full ${colorClass}">${status}</span></td>
+      <tr class="border-b last:border-0 border-slate-100 dark:border-slate-700 align-top">
+        <td class="py-3"><div class="flex items-center gap-2 text-slate-700 dark:text-slate-200">${avatarHtml(sup, 8)}<span>${esc(sup.name)}</span></div></td>
+        <td class="py-3 text-slate-500 dark:text-slate-400">${esc(sup.jobTitle)}</td>
+        <td class="py-3 text-slate-700 dark:text-slate-200 whitespace-nowrap">
+          ${done.length}/${targets.length}
+          <div class="w-24 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full mt-1"><div class="h-1.5 rounded-full bg-emerald-500" style="width:${pct}%"></div></div>
+        </td>
+        <td class="py-3"><span class="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${STATUS_STYLE[status]}">${status}</span></td>
+        <td class="py-3 text-xs text-slate-400">${left.length ? left.map(t => esc(t.name.split(' ')[0])).join(', ') : '&mdash;'}</td>
       </tr>`;
   }).join('');
 
+  const chip = (label) => `<span class="text-xs font-semibold px-3 py-1 rounded-full ${STATUS_STYLE[label]}">${label}: ${counts[label]}</span>`;
+
   sidebarShell('completion', `
-    <h1 class="text-xl font-bold text-slate-800 dark:text-slate-100 mb-5">✅ Completion Tracker — ${deptLabel(user.dept)} Department</h1>
+    <h1 class="text-xl font-bold text-slate-800 dark:text-slate-100 mb-1">✅ Completion Tracker</h1>
+    <p class="text-sm text-slate-400 mb-4">Evaluation period: ${periodLabel} &middot; counts reset each month</p>
+    <div class="flex flex-wrap gap-2 mb-4">${chip('Completed')}${chip('Pending')}${chip('Not Yet Started')}</div>
     <div class="bg-white dark:bg-slate-800 rounded-xl card-shadow p-4 overflow-x-auto">
-      <table class="w-full text-sm min-w-[500px]">
+      <table class="w-full text-sm min-w-[600px]">
         <thead><tr class="text-left text-slate-400 border-b border-slate-200 dark:border-slate-700">
-          <th class="py-2">Name</th><th class="py-2">Position</th><th class="py-2">No. of Employees Evaluated</th><th class="py-2">Status</th>
+          <th class="py-2">Name</th><th class="py-2">Position</th><th class="py-2">No. of Employees Evaluated</th><th class="py-2">Status</th><th class="py-2">Still to evaluate</th>
         </tr></thead>
         <tbody>${rows}</tbody>
       </table>
     </div>
+    <p class="text-xs text-slate-400 mt-3"><span class="font-semibold text-emerald-600">Completed</span> = evaluated everyone &middot; <span class="font-semibold text-sky-600">Pending</span> = started, some left &middot; <span class="font-semibold text-red-500">Not Yet Started</span> = no evaluations yet this month.</p>
   `);
 }
 
@@ -1204,8 +1410,8 @@ function adminShell(activeKey, innerHtml) {
     </aside>
     <main class="flex-1 min-w-0 p-6 overflow-x-hidden">
       <div class="flex items-center justify-between mb-5">
-        <div class="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-bold text-lg">
-          <span>📈</span><span>stratavise</span><span class="text-xs font-semibold text-amber-500 bg-amber-100 dark:bg-amber-900/40 px-2 py-0.5 rounded-full ml-2">ADMIN</span>
+        <div class="flex items-center gap-2 font-bold text-lg">
+          ${brandHtml('<span class="text-xs font-semibold text-amber-500 bg-amber-100 dark:bg-amber-900/40 px-2 py-0.5 rounded-full ml-2">ADMIN</span>')}
         </div>
       </div>
       ${innerHtml}
@@ -1408,8 +1614,9 @@ function renderAdminCriteria() {
 
   const criteriaRows = db.criteria.map(c => `
     <tr class="border-b last:border-0 border-slate-100 dark:border-slate-700">
-      <td class="py-2 text-slate-700 dark:text-slate-200">${c.name}</td>
+      <td class="py-2 text-slate-700 dark:text-slate-200">${esc(c.name)}</td>
       <td class="py-2 text-slate-700 dark:text-slate-200">${c.weight}%</td>
+      <td class="py-2 text-slate-500 dark:text-slate-400">${(c.questions || []).length}</td>
       <td class="py-2">
         <button onclick="openCriterionModal('${c.id}')" class="bg-blue-500 hover:bg-blue-600 text-white text-xs px-2.5 py-1 rounded-md mr-1">Edit</button>
         <button onclick="deleteCriterion('${c.id}')" class="bg-red-500 hover:bg-red-600 text-white text-xs px-2.5 py-1 rounded-md">Delete</button>
@@ -1428,12 +1635,22 @@ function renderAdminCriteria() {
 
   const rewardRows = db.rewards.map(r => `
     <tr class="border-b last:border-0 border-slate-100 dark:border-slate-700 align-top">
-      <td class="py-2 pr-3 font-medium text-slate-700 dark:text-slate-200 whitespace-nowrap">${r.level}</td>
-      <td class="py-2 pr-3 text-slate-600 dark:text-slate-300">${r.benefits}</td>
-      <td class="py-2 pr-3 text-slate-500 dark:text-slate-400">${r.desc}</td>
+      <td class="py-2 pr-3 font-medium text-slate-700 dark:text-slate-200 whitespace-nowrap">${esc(r.level)}</td>
+      <td class="py-2 pr-3 text-slate-600 dark:text-slate-300">${esc(r.benefits)}</td>
+      <td class="py-2 pr-3 text-slate-500 dark:text-slate-400">${esc(r.desc)}</td>
       <td class="py-2 whitespace-nowrap">
         <button onclick="openRewardModal('${r.id}')" class="bg-blue-500 hover:bg-blue-600 text-white text-xs px-2.5 py-1 rounded-md mr-1">Edit</button>
         <button onclick="deleteReward('${r.id}')" class="bg-red-500 hover:bg-red-600 text-white text-xs px-2.5 py-1 rounded-md">Delete</button>
+      </td>
+    </tr>`).join('');
+
+  const benefitRows = getBenefits().map(b => `
+    <tr class="border-b last:border-0 border-slate-100 dark:border-slate-700 align-top">
+      <td class="py-2 pr-3 font-medium text-slate-700 dark:text-slate-200 whitespace-nowrap">${esc(b.benefit)}</td>
+      <td class="py-2 pr-3 text-slate-500 dark:text-slate-400">${esc(b.desc)}</td>
+      <td class="py-2 whitespace-nowrap">
+        <button onclick="openBenefitModal('${b.id}')" class="bg-blue-500 hover:bg-blue-600 text-white text-xs px-2.5 py-1 rounded-md mr-1">Edit</button>
+        <button onclick="deleteBenefit('${b.id}')" class="bg-red-500 hover:bg-red-600 text-white text-xs px-2.5 py-1 rounded-md">Delete</button>
       </td>
     </tr>`).join('');
 
@@ -1451,7 +1668,7 @@ function renderAdminCriteria() {
       <div class="grid lg:grid-cols-2 gap-5 items-start">
         <div>
           <table class="w-full text-sm">
-            <thead><tr class="text-left text-slate-400 border-b border-slate-200 dark:border-slate-700"><th class="py-2">Criteria</th><th class="py-2">Weight</th><th class="py-2">Action</th></tr></thead>
+            <thead><tr class="text-left text-slate-400 border-b border-slate-200 dark:border-slate-700"><th class="py-2">Criteria</th><th class="py-2">Weight</th><th class="py-2">Questions</th><th class="py-2">Action</th></tr></thead>
             <tbody>${criteriaRows}</tbody>
           </table>
           ${weightTotal !== 100 ? `<p class="text-xs text-red-500 mt-2">⚠ Weights should total 100% for scores to read as a true percentage.</p>` : ''}
@@ -1488,6 +1705,17 @@ function renderAdminCriteria() {
       <table class="w-full text-sm min-w-[700px]">
         <thead><tr class="text-left text-slate-400 border-b border-slate-200 dark:border-slate-700"><th class="py-2">Performance Level</th><th class="py-2">Benefits Granted</th><th class="py-2">Description</th><th class="py-2">Action</th></tr></thead>
         <tbody>${rewardRows}</tbody>
+      </table>
+    </div>
+
+    <div class="bg-white dark:bg-slate-800 rounded-xl card-shadow p-5 mt-5 overflow-x-auto">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="font-semibold text-slate-700 dark:text-slate-200">Benefits Description</h3>
+        <button onclick="openBenefitModal()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-1.5 rounded-md">+ Add Benefit</button>
+      </div>
+      <table class="w-full text-sm min-w-[600px]">
+        <thead><tr class="text-left text-slate-400 border-b border-slate-200 dark:border-slate-700"><th class="py-2">Benefit</th><th class="py-2">Description</th><th class="py-2">Action</th></tr></thead>
+        <tbody>${benefitRows}</tbody>
       </table>
     </div>
     <div id="modalRoot"></div>
@@ -1538,22 +1766,27 @@ function openCriterionModal(id) {
   const c = id ? db.criteria.find(x => x.id === id) : null;
   document.getElementById('modalRoot').innerHTML = `
   <div class="fixed inset-0 modal-backdrop flex items-center justify-center z-40 p-4">
-    <div class="bg-white dark:bg-slate-800 rounded-xl w-full max-w-md overflow-hidden shadow-2xl">
-      <div class="bg-indigo-600 text-white px-5 py-3 flex items-center justify-between">
+    <div class="bg-white dark:bg-slate-800 rounded-xl w-full max-w-2xl overflow-hidden shadow-2xl max-h-[90vh] flex flex-col">
+      <div class="bg-indigo-600 text-white px-5 py-3 flex items-center justify-between shrink-0">
         <h3 class="font-semibold">${c ? 'Edit Criterion' : 'Add Criterion'}</h3>
         <button onclick="closeModal()" class="text-white/80 hover:text-white">✕</button>
       </div>
-      <div class="p-5 space-y-3">
+      <div class="p-5 space-y-3 overflow-y-auto">
         <div>
           <label class="block text-sm text-slate-500 dark:text-slate-300 mb-1">Criterion Name</label>
-          <input id="fCritName" value="${c ? c.name : ''}" class="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg px-3 py-2" />
+          <input id="fCritName" value="${c ? esc(c.name) : ''}" class="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg px-3 py-2" />
         </div>
         <div>
           <label class="block text-sm text-slate-500 dark:text-slate-300 mb-1">Weight (%)</label>
           <input id="fCritWeight" type="number" min="0" max="100" value="${c ? c.weight : ''}" class="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg px-3 py-2" />
         </div>
+        <div>
+          <label class="block text-sm text-slate-500 dark:text-slate-300 mb-1">Evaluation Questions</label>
+          <textarea id="fCritQuestions" rows="9" class="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg px-3 py-2 text-sm" placeholder="One question per line.&#10;English question || Filipino translation (translation is optional)">${c ? esc((c.questions || []).map(q => q.en + (q.tl ? ' || ' + q.tl : '')).join('\n')) : ''}</textarea>
+          <p class="text-xs text-slate-400 mt-1">One question per line. Put the Filipino translation after <code>||</code>. The rating for the criterion is the average of the answers to its questions.</p>
+        </div>
       </div>
-      <div class="px-5 py-4 bg-slate-50 dark:bg-slate-900/40 flex justify-end gap-2">
+      <div class="px-5 py-4 bg-slate-50 dark:bg-slate-900/40 flex justify-end gap-2 shrink-0">
         <button onclick="closeModal()" class="px-4 py-2 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700">Cancel</button>
         <button onclick="saveCriterion(${c ? `'${c.id}'` : 'null'})" class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold">Save</button>
       </div>
@@ -1566,12 +1799,14 @@ function saveCriterion(id) {
   const weight = Number(document.getElementById('fCritWeight').value);
   if (!name || isNaN(weight) || weight < 0) { toast('Enter a valid name and weight', 'error'); return; }
   const db = getDB();
-  if (id) {
-    const c = db.criteria.find(x => x.id === id);
-    c.name = name; c.weight = weight;
-  } else {
-    db.criteria.push({ id: uid('c'), name, weight });
-  }
+  const target = id ? db.criteria.find(x => x.id === id) : { id: uid('c'), name, weight };
+  const lines = document.getElementById('fCritQuestions').value.split('\n').map(l => l.trim()).filter(Boolean);
+  const questions = lines.map((line, i) => {
+    const parts = line.split('||');
+    return { id: target.id + 'q' + (i + 1), en: parts[0].trim(), tl: (parts[1] || '').trim() };
+  }).filter(q => q.en);
+  if (id) { target.name = name; target.weight = weight; target.questions = questions; }
+  else { target.questions = questions; db.criteria.push(target); }
   setDB(db);
   closeModal();
   toast('Criterion saved');
@@ -1704,6 +1939,58 @@ function deleteReward(id) {
   db.rewards = db.rewards.filter(r => r.id !== id);
   setDB(db);
   toast('Reward deleted');
+  renderAdminCriteria();
+}
+
+/* --- Benefits Description modal --- */
+function openBenefitModal(id) {
+  const db = getDB();
+  const b = id ? db.benefits.find(x => x.id === id) : null;
+  document.getElementById('modalRoot').innerHTML = `
+  <div class="fixed inset-0 modal-backdrop flex items-center justify-center z-40 p-4">
+    <div class="bg-white dark:bg-slate-800 rounded-xl w-full max-w-lg overflow-hidden shadow-2xl">
+      <div class="bg-amber-600 text-white px-5 py-3 flex items-center justify-between">
+        <h3 class="font-semibold">${b ? 'Edit Benefit' : 'Add Benefit'}</h3>
+        <button onclick="closeModal()" class="text-white/80 hover:text-white">✕</button>
+      </div>
+      <div class="p-5 space-y-3">
+        <div>
+          <label class="block text-sm text-slate-500 dark:text-slate-300 mb-1">Benefit</label>
+          <input id="fBenefitName" value="${b ? esc(b.benefit) : ''}" class="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg px-3 py-2" />
+        </div>
+        <div>
+          <label class="block text-sm text-slate-500 dark:text-slate-300 mb-1">Description</label>
+          <textarea id="fBenefitDesc" rows="3" class="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg px-3 py-2">${b ? esc(b.desc) : ''}</textarea>
+        </div>
+      </div>
+      <div class="px-5 py-4 bg-slate-50 dark:bg-slate-900/40 flex justify-end gap-2">
+        <button onclick="closeModal()" class="px-4 py-2 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700">Cancel</button>
+        <button onclick="saveBenefit(${b ? `'${b.id}'` : 'null'})" class="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-semibold">Save</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function saveBenefit(id) {
+  const benefit = document.getElementById('fBenefitName').value.trim();
+  const desc = document.getElementById('fBenefitDesc').value.trim();
+  if (!benefit || !desc) { toast('Benefit and description are required', 'error'); return; }
+  const db = getDB();
+  db.benefits = db.benefits || [];
+  if (id) { Object.assign(db.benefits.find(x => x.id === id), { benefit, desc }); }
+  else { db.benefits.push({ id: uid('bd'), benefit, desc }); }
+  setDB(db);
+  closeModal();
+  toast('Benefit saved');
+  renderAdminCriteria();
+}
+
+function deleteBenefit(id) {
+  if (!confirm('Delete this benefit?')) return;
+  const db = getDB();
+  db.benefits = (db.benefits || []).filter(b => b.id !== id);
+  setDB(db);
+  toast('Benefit deleted');
   renderAdminCriteria();
 }
 
@@ -1880,7 +2167,7 @@ function viewAdminEvaluation(evalId) {
   const rows = criteria.map(c => `
     <tr class="border-b last:border-0 border-slate-100 dark:border-slate-700">
       <td class="py-1.5 text-slate-700 dark:text-slate-200">${c.name}</td>
-      <td class="py-1.5 text-slate-700 dark:text-slate-200">${ev.ratings[c.id] ?? '-'}/5</td>
+      <td class="py-1.5 text-slate-700 dark:text-slate-200">${ev.ratings[c.id] == null ? '-' : fmtNum(ev.ratings[c.id])}/5</td>
     </tr>`).join('');
 
   document.getElementById('modalRoot').innerHTML = `
@@ -1892,10 +2179,11 @@ function viewAdminEvaluation(evalId) {
       </div>
       <div class="p-5 overflow-y-auto grid md:grid-cols-2 gap-6">
         <div>
-          <p class="text-sm text-slate-700 dark:text-slate-200"><strong>Employee:</strong> ${emp ? emp.name : 'Unknown'}</p>
-          <p class="text-sm text-slate-700 dark:text-slate-200"><strong>Evaluator:</strong> ${evaluator ? evaluator.name : 'Unknown'}</p>
+          <p class="text-sm text-slate-700 dark:text-slate-200"><strong>Employee:</strong> ${emp ? esc(emp.name) : 'Unknown'}</p>
+          <p class="text-sm text-slate-700 dark:text-slate-200"><strong>Evaluator:</strong> ${evaluator ? esc(evaluator.name) : 'Unknown'}</p>
           <p class="text-sm text-slate-700 dark:text-slate-200 mb-3"><strong>Date:</strong> ${ev.date} &middot; ${ev.time}</p>
           <table class="w-full text-sm mb-3">${rows}</table>
+          ${ev.comment ? `<div class="mb-3 text-sm"><p class="font-semibold text-slate-600 dark:text-slate-300 mb-1">Additional comments</p><p class="text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700/50 rounded-lg p-3 whitespace-pre-line">${esc(ev.comment)}</p></div>` : ''}
           <div class="bg-emerald-50 dark:bg-emerald-900/30 rounded-lg p-3 text-center">
             <span class="text-xl font-bold text-emerald-700 dark:text-emerald-300">${ev.finalScore}%</span>
             <p class="text-sm text-emerald-600 dark:text-emerald-400 font-semibold">${ev.level}</p>
