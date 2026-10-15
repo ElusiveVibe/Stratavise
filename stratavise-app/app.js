@@ -46,6 +46,7 @@ function wrapLabel(name, max) {
   if (cur) lines.push(cur);
   return lines;
 }
+function isSelfEval(ev) { return ev && ev.evaluatorId === ev.employeeId; }
 function samePeriod(ts, ref) { const a = new Date(ts), b = new Date(ref || Date.now()); return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth(); }
 
 function levelForScore(score) {
@@ -285,6 +286,9 @@ function router() {
     if (segs[1] === 'criteria') return renderAdminCriteria();
     if (segs[1] === 'departments') return renderAdminDepartments();
     if (segs[1] === 'evaluations') return renderAdminEvaluations();
+    if (segs[1] === 'toppers') return renderAdminTopPerformers();
+    if (segs[1] === 'completion') return renderAdminCompletion();
+    if (segs[1] === 'leaderboard') return renderAdminLeaderboard();
     return renderAdminDashboard();
   }
   if (segs[0] === 'home') return renderHome();
@@ -317,6 +321,26 @@ function toast(msg, type) {
 }
 
 function closeModal() { const m = document.getElementById('modalRoot'); if (m) m.innerHTML = ''; }
+
+// Crops to a square and shrinks to 480px so photos stay small enough for browser storage.
+function readAvatarFile(file, cb) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    const img = new Image();
+    img.onload = () => {
+      const side = Math.min(img.width, img.height);
+      const sx = (img.width - side) / 2;
+      const sy = img.height > img.width ? 0 : (img.height - side) / 2; // keep the top (faces) for portrait photos
+      const out = Math.min(480, side);
+      const canvas = document.createElement('canvas'); canvas.width = out; canvas.height = out;
+      canvas.getContext('2d').drawImage(img, sx, sy, side, side, 0, 0, out, out);
+      cb(canvas.toDataURL('image/jpeg', 0.85));
+    };
+    img.onerror = () => toast('Could not read that image', 'error');
+    img.src = reader.result;
+  };
+  reader.readAsDataURL(file);
+}
 
 function avatarHtml(user, size) {
   size = size || 10;
@@ -657,7 +681,7 @@ function topPerformersHtml(db) {
       </div>
       <div class="flex-1 min-w-0 rounded-lg border-2 bg-white dark:bg-slate-800 p-4" style="border-color:${t.border}">
         <p class="font-bold text-slate-800 dark:text-slate-100 text-sm mb-2">${esc(u.name)} &ndash; ${esc(u.jobTitle)}</p>
-        <p class="text-sm italic text-slate-600 dark:text-slate-300 leading-relaxed whitespace-pre-line">${esc(ent.quote)}</p>
+        ${ent.quote ? `<p class="text-sm italic text-slate-600 dark:text-slate-300 leading-relaxed whitespace-pre-line">${esc(ent.quote)}</p>` : '<p class="text-sm text-slate-400">&mdash;</p>'}
       </div>
     </div>`;
   }).join('');
@@ -810,8 +834,8 @@ let _evalSearch = '';
 function renderEvaluateChoose() {
   const user = currentUser(); if (!user) return;
   const db = getDB();
-  // Every other member of the team can be evaluated (the roster has one person per department).
-  const pool = db.users.filter(u => u.id !== user.id);
+  // Everyone on the team can be evaluated, including yourself (self-evaluation, shown first).
+  const pool = db.users.slice().sort((a, b) => (b.id === user.id) - (a.id === user.id));
   const filtered = pool.filter(u => !_evalSearch || u.name.toLowerCase().includes(_evalSearch.toLowerCase()));
   // Who has this person already evaluated during the current period?
   const doneIds = new Set(db.evaluations.filter(e => e.evaluatorId === user.id && samePeriod(e.ts)).map(e => e.employeeId));
@@ -822,6 +846,7 @@ function renderEvaluateChoose() {
       <div class="min-w-0 flex-1">
         <p class="font-bold text-slate-800 dark:text-slate-100 text-sm truncate">${esc(u.name)}</p>
         <p class="text-xs text-slate-500 dark:text-slate-400 truncate">${esc(deptLabel(u.dept))} - ${esc(u.jobTitle)}</p>
+        ${u.id === user.id ? `<span class="inline-block mt-1 mr-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300">You &middot; Self-evaluation</span>` : ''}
         ${doneIds.has(u.id) ? `<span class="inline-block mt-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300">✓ Evaluated this month</span>` : ''}
       </div>
     </button>`).join('') || `<p class="text-slate-400 text-sm col-span-full text-center py-10">No one to evaluate here.</p>`;
@@ -848,7 +873,8 @@ function renderEvaluateForm(employeeId) {
   const user = currentUser(); if (!user) return;
   const db = getDB();
   const emp = db.users.find(u => u.id === employeeId);
-  if (!emp || emp.id === user.id) { location.hash = '#/evaluate'; return; }
+  if (!emp) { location.hash = '#/evaluate'; return; }
+  const isSelf = emp.id === user.id;
   const criteria = getCriteria();
   const totalQuestions = criteria.reduce((n, c) => n + criterionQuestions(c).length, 0);
 
@@ -880,8 +906,8 @@ function renderEvaluateForm(employeeId) {
     <div class="flex items-center gap-3 mb-5">
       ${avatarHtml(emp, 16)}
       <div>
-        <h1 class="text-xl font-bold text-slate-800 dark:text-slate-100">Evaluating ${esc(emp.name)}</h1>
-        <p class="text-sm text-slate-400">${esc(deptLabel(emp.dept))} - ${esc(emp.jobTitle)}</p>
+        <h1 class="text-xl font-bold text-slate-800 dark:text-slate-100">${isSelf ? 'Self-evaluation' : 'Evaluating ' + esc(emp.name)}</h1>
+        <p class="text-sm text-slate-400">${isSelf ? esc(emp.name) + ' &middot; ' : ''}${esc(deptLabel(emp.dept))} - ${esc(emp.jobTitle)}</p>
       </div>
     </div>
     <div class="max-w-3xl">
@@ -1028,7 +1054,7 @@ function renderProgressTracker() {
     sidebarShell('progress', `
       <h1 class="text-xl font-bold text-slate-800 dark:text-slate-100 mb-4">📈 Progress Tracker</h1>
       ${tabs}
-      <p class="text-sm text-slate-500 dark:text-slate-400 mb-3">Date: <strong class="text-slate-700 dark:text-slate-200">${esc(ev.date)}</strong></p>
+      <p class="text-sm text-slate-500 dark:text-slate-400 mb-3">Date: <strong class="text-slate-700 dark:text-slate-200">${esc(ev.date)}</strong>${isSelfEval(ev) ? ' <span class="ml-2 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300">Self-evaluation</span>' : ''}</p>
       <div class="grid lg:grid-cols-2 gap-5">
         <div class="bg-white dark:bg-slate-800 rounded-xl card-shadow p-5">
           <table class="w-full text-sm mb-4">
@@ -1063,7 +1089,7 @@ function renderProgressTracker() {
   } else {
     const historyCards = myEvals.map(ev => `
       <div class="bg-white dark:bg-slate-800 rounded-xl card-shadow p-4">
-        <p class="text-xs text-slate-400 mb-1">Date: ${esc(ev.date)}</p>
+        <p class="text-xs text-slate-400 mb-1">Date: ${esc(ev.date)}${isSelfEval(ev) ? ' <span class="ml-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300">Self</span>' : ''}</p>
         <p class="text-3xl font-bold text-slate-800 dark:text-slate-100">${ev.finalScore}%</p>
         <p class="text-sm font-semibold text-emerald-600 dark:text-emerald-400 mb-3">${esc(ev.level)}</p>
         ${criteria.map(c => `<p class="text-xs text-slate-500 dark:text-slate-400 flex justify-between gap-2"><span class="truncate">${esc(c.name)}</span><span class="shrink-0 font-medium">${ev.ratings[c.id] == null ? '-' : fmtNum((ev.ratings[c.id] / 5) * c.weight) + '%'}</span></p>`).join('')}
@@ -1185,16 +1211,14 @@ function renderSettings() {
   document.getElementById('avatarInput').addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
+    readAvatarFile(file, (dataUrl) => {
       const db = getDB();
       const u = db.users.find(x => x.id === user.id);
-      u.avatar = reader.result;
+      u.avatar = dataUrl;
       setDB(db);
       toast('Profile picture updated');
       renderSettings();
-    };
-    reader.readAsDataURL(file);
+    });
   });
 }
 
@@ -1223,12 +1247,8 @@ function leaderboardData(db) {
     .sort((a, b) => b.ev.finalScore - a.ev.finalScore);
 }
 
-function renderLeaderboard() {
-  const user = currentUser(); if (!user) return;
-  if (user.role !== 'supervisor') { location.hash = '#/home'; return; }
-  const db = getDB();
+function leaderboardBody(db) {
   const ranked = leaderboardData(db);
-
   const rows = ranked.map((x, idx) => `
     <tr class="border-b last:border-0 border-slate-100 dark:border-slate-700">
       <td class="py-2 pr-3 text-slate-700 dark:text-slate-200 font-semibold">${idx + 1}</td>
@@ -1240,14 +1260,13 @@ function renderLeaderboard() {
       <td class="py-2 pr-3"><span class="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300">${esc(x.ev.level)}</span></td>
     </tr>`).join('') || `<tr><td colspan="7" class="py-6 text-center text-slate-400">No evaluations yet.</td></tr>`;
 
-  // Distribution of performance levels
   const dist = {};
   getRatingScale().forEach(t => dist[t.label] = 0);
   ranked.forEach(x => { dist[x.ev.level] = (dist[x.ev.level] || 0) + 1; });
   const distLabels = Object.keys(dist).filter(k => dist[k] > 0);
   const distData = distLabels.map(k => dist[k]);
 
-  sidebarShell('leaderboard', `
+  const html = `
     <div class="flex items-center justify-between mb-5 flex-wrap gap-3">
       <h1 class="text-xl font-bold text-slate-800 dark:text-slate-100">🏆 Leaderboard &mdash; All Departments</h1>
       <div class="flex gap-2">
@@ -1269,9 +1288,11 @@ function renderLeaderboard() {
         <h3 class="text-sm font-semibold text-slate-500 dark:text-slate-400 mb-2">Performance Level Distribution</h3>
         <canvas id="leaderboardPie" height="220"></canvas>
       </div>
-    </div>
-  `);
+    </div>`;
+  return { html, distLabels, distData };
+}
 
+function drawLeaderboardPie(distLabels, distData) {
   if (_leaderboardPie) _leaderboardPie.destroy();
   const ctx = document.getElementById('leaderboardPie');
   if (ctx) {
@@ -1281,6 +1302,14 @@ function renderLeaderboard() {
       options: { plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } } } }
     });
   }
+}
+
+function renderLeaderboard() {
+  const user = currentUser(); if (!user) return;
+  if (user.role !== 'supervisor') { location.hash = '#/home'; return; }
+  const body = leaderboardBody(getDB());
+  sidebarShell('leaderboard', body.html);
+  drawLeaderboardPie(body.distLabels, body.distData);
 }
 
 function exportLeaderboardExcel() {
@@ -1310,13 +1339,10 @@ function exportLeaderboardPDF() {
 }
 
 /* ---------------------- COMPLETION TRACKER (Supervisor) ---------------------- */
-function renderCompletionTracker() {
-  const user = currentUser(); if (!user) return;
-  if (user.role !== 'supervisor') { location.hash = '#/home'; return; }
-  const db = getDB();
+function completionBody(db) {
   const periodLabel = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-
-  const supervisors = db.users.filter(u => u.role === 'supervisor');
+  // Every member is tracked (supervisors first, then employees). Each one evaluates all members, including themselves.
+  const members = db.users.slice().sort((a, b) => (a.role === b.role ? 0 : a.role === 'supervisor' ? -1 : 1));
   const counts = { 'Completed': 0, 'Pending': 0, 'Not Yet Started': 0 };
   const STATUS_STYLE = {
     'Completed': 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300',
@@ -1324,10 +1350,9 @@ function renderCompletionTracker() {
     'Not Yet Started': 'bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300'
   };
 
-  const rows = supervisors.map(sup => {
-    // Everyone else on the team should be evaluated by this supervisor once per period (calendar month)
-    const targets = db.users.filter(u => u.id !== sup.id);
-    const doneIds = new Set(db.evaluations.filter(e => e.evaluatorId === sup.id && samePeriod(e.ts)).map(e => e.employeeId));
+  const rows = members.map(m => {
+    const targets = db.users;
+    const doneIds = new Set(db.evaluations.filter(e => e.evaluatorId === m.id && samePeriod(e.ts)).map(e => e.employeeId));
     const done = targets.filter(t => doneIds.has(t.id));
     const left = targets.filter(t => !doneIds.has(t.id));
     let status;
@@ -1336,35 +1361,43 @@ function renderCompletionTracker() {
     else status = 'Pending';
     counts[status]++;
     const pct = targets.length ? Math.round((done.length / targets.length) * 100) : 0;
+    const roleChip = m.role === 'supervisor'
+      ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300'
+      : 'bg-sky-100 text-sky-700 dark:bg-sky-900/50 dark:text-sky-300';
     return `
       <tr class="border-b last:border-0 border-slate-100 dark:border-slate-700 align-top">
-        <td class="py-3"><div class="flex items-center gap-2 text-slate-700 dark:text-slate-200">${avatarHtml(sup, 8)}<span>${esc(sup.name)}</span></div></td>
-        <td class="py-3 text-slate-500 dark:text-slate-400">${esc(sup.jobTitle)}</td>
-        <td class="py-3 text-slate-700 dark:text-slate-200 whitespace-nowrap">
+        <td class="py-3 pr-3"><div class="flex items-center gap-2 text-slate-700 dark:text-slate-200">${avatarHtml(m, 8)}<span>${esc(m.name)}</span></div></td>
+        <td class="py-3 pr-3 text-slate-500 dark:text-slate-400">${esc(m.jobTitle)}<br/><span class="inline-block mt-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${roleChip}">${m.role}</span></td>
+        <td class="py-3 pr-3 text-slate-700 dark:text-slate-200 whitespace-nowrap">
           ${done.length}/${targets.length}
           <div class="w-24 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full mt-1"><div class="h-1.5 rounded-full bg-emerald-500" style="width:${pct}%"></div></div>
         </td>
-        <td class="py-3"><span class="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${STATUS_STYLE[status]}">${status}</span></td>
-        <td class="py-3 text-xs text-slate-400">${left.length ? left.map(t => esc(t.name.split(' ')[0])).join(', ') : '&mdash;'}</td>
+        <td class="py-3 pr-3"><span class="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${STATUS_STYLE[status]}">${status}</span></td>
+        <td class="py-3 text-xs text-slate-400">${left.length ? left.map(t => t.id === m.id ? 'Self' : esc(t.name.split(' ')[0])).join(', ') : '&mdash;'}</td>
       </tr>`;
-  }).join('');
+  }).join('') || `<tr><td colspan="5" class="py-6 text-center text-slate-400">No members yet.</td></tr>`;
 
   const chip = (label) => `<span class="text-xs font-semibold px-3 py-1 rounded-full ${STATUS_STYLE[label]}">${label}: ${counts[label]}</span>`;
 
-  sidebarShell('completion', `
+  return `
     <h1 class="text-xl font-bold text-slate-800 dark:text-slate-100 mb-1">✅ Completion Tracker</h1>
-    <p class="text-sm text-slate-400 mb-4">Evaluation period: ${periodLabel} &middot; counts reset each month</p>
+    <p class="text-sm text-slate-400 mb-4">Evaluation period: ${periodLabel} &middot; counts reset each month &middot; includes supervisors, employees and self-evaluations</p>
     <div class="flex flex-wrap gap-2 mb-4">${chip('Completed')}${chip('Pending')}${chip('Not Yet Started')}</div>
     <div class="bg-white dark:bg-slate-800 rounded-xl card-shadow p-4 overflow-x-auto">
-      <table class="w-full text-sm min-w-[600px]">
+      <table class="w-full text-sm min-w-[650px]">
         <thead><tr class="text-left text-slate-400 border-b border-slate-200 dark:border-slate-700">
-          <th class="py-2">Name</th><th class="py-2">Position</th><th class="py-2">No. of Employees Evaluated</th><th class="py-2">Status</th><th class="py-2">Still to evaluate</th>
+          <th class="py-2 pr-3">Name</th><th class="py-2 pr-3">Position</th><th class="py-2 pr-3">No. of Employees Evaluated</th><th class="py-2 pr-3">Status</th><th class="py-2">Still to evaluate</th>
         </tr></thead>
         <tbody>${rows}</tbody>
       </table>
     </div>
-    <p class="text-xs text-slate-400 mt-3"><span class="font-semibold text-emerald-600">Completed</span> = evaluated everyone &middot; <span class="font-semibold text-sky-600">Pending</span> = started, some left &middot; <span class="font-semibold text-red-500">Not Yet Started</span> = no evaluations yet this month.</p>
-  `);
+    <p class="text-xs text-slate-400 mt-3"><span class="font-semibold text-emerald-600">Completed</span> = evaluated everyone, including themselves &middot; <span class="font-semibold text-sky-600">Pending</span> = started, some left &middot; <span class="font-semibold text-red-500">Not Yet Started</span> = no evaluations yet this month.</p>`;
+}
+
+function renderCompletionTracker() {
+  const user = currentUser(); if (!user) return;
+  if (user.role !== 'supervisor') { location.hash = '#/home'; return; }
+  sidebarShell('completion', completionBody(getDB()));
 }
 
 /* =========================================================
@@ -1379,7 +1412,10 @@ function adminNavItems() {
     { key: 'employees', label: 'Manage Employees', icon: '👤' },
     { key: 'criteria', label: 'Criteria & Scoring', icon: '🧮' },
     { key: 'departments', label: 'Departments', icon: '🏷️' },
-    { key: 'evaluations', label: 'All Evaluations', icon: '📊' }
+    { key: 'evaluations', label: 'All Evaluations', icon: '📊' },
+    { key: 'toppers', label: 'Top Performers', icon: '⭐' },
+    { key: 'completion', label: 'Completion Tracker', icon: '✅' },
+    { key: 'leaderboard', label: 'Leaderboard', icon: '🏆' }
   ];
 }
 
@@ -1456,7 +1492,7 @@ function renderAdminDashboard() {
       </a>
       <a href="#/admin/criteria" class="bg-white dark:bg-slate-800 rounded-xl card-shadow p-5 hover:ring-2 hover:ring-emerald-400 transition">
         <p class="font-semibold text-slate-700 dark:text-slate-200 mb-1">🧮 Criteria & Scoring</p>
-        <p class="text-xs text-slate-400">Edit evaluation criteria, weights, the rating scale, and rewards.</p>
+        <p class="text-xs text-slate-400">Edit criteria, weights, evaluation questions, the rating scale, rewards and the benefits description.</p>
       </a>
       <a href="#/admin/departments" class="bg-white dark:bg-slate-800 rounded-xl card-shadow p-5 hover:ring-2 hover:ring-emerald-400 transition">
         <p class="font-semibold text-slate-700 dark:text-slate-200 mb-1">🏷️ Departments</p>
@@ -1465,6 +1501,18 @@ function renderAdminDashboard() {
       <a href="#/admin/evaluations" class="bg-white dark:bg-slate-800 rounded-xl card-shadow p-5 hover:ring-2 hover:ring-emerald-400 transition">
         <p class="font-semibold text-slate-700 dark:text-slate-200 mb-1">📊 All Evaluations</p>
         <p class="text-xs text-slate-400">View or delete any evaluation submitted company-wide.</p>
+      </a>
+      <a href="#/admin/toppers" class="bg-white dark:bg-slate-800 rounded-xl card-shadow p-5 hover:ring-2 hover:ring-emerald-400 transition">
+        <p class="font-semibold text-slate-700 dark:text-slate-200 mb-1">⭐ Top Performers</p>
+        <p class="text-xs text-slate-400">Choose who is featured on the Home page, with their score and message.</p>
+      </a>
+      <a href="#/admin/completion" class="bg-white dark:bg-slate-800 rounded-xl card-shadow p-5 hover:ring-2 hover:ring-emerald-400 transition">
+        <p class="font-semibold text-slate-700 dark:text-slate-200 mb-1">✅ Completion Tracker</p>
+        <p class="text-xs text-slate-400">See who has finished, started or not yet started evaluating this month.</p>
+      </a>
+      <a href="#/admin/leaderboard" class="bg-white dark:bg-slate-800 rounded-xl card-shadow p-5 hover:ring-2 hover:ring-emerald-400 transition">
+        <p class="font-semibold text-slate-700 dark:text-slate-200 mb-1">🏆 Leaderboard</p>
+        <p class="text-xs text-slate-400">Company-wide ranking with Excel and PDF export.</p>
       </a>
     </div>
   `);
@@ -1487,9 +1535,9 @@ function renderAdminEmployees() {
 
   const rows = filtered.map(u => `
     <tr class="border-b last:border-0 border-slate-100 dark:border-slate-700">
-      <td class="py-2 flex items-center gap-2 text-slate-700 dark:text-slate-200">${avatarHtml(u, 8)} ${u.name}</td>
-      <td class="py-2 text-slate-500 dark:text-slate-400">${deptLabel(u.dept)}</td>
-      <td class="py-2 text-slate-500 dark:text-slate-400">${u.jobTitle}</td>
+      <td class="py-2 flex items-center gap-2 text-slate-700 dark:text-slate-200">${avatarHtml(u, 8)} ${esc(u.name)}</td>
+      <td class="py-2 text-slate-500 dark:text-slate-400">${esc(deptLabel(u.dept))}</td>
+      <td class="py-2 text-slate-500 dark:text-slate-400">${esc(u.jobTitle)}</td>
       <td class="py-2"><span class="text-xs font-semibold px-2 py-0.5 rounded-full ${u.role === 'supervisor' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300' : 'bg-sky-100 text-sky-700 dark:bg-sky-900/50 dark:text-sky-300'}">${u.role}</span></td>
       <td class="py-2">
         <button onclick="openAdminEmployeeModal('${u.id}')" class="bg-blue-500 hover:bg-blue-600 text-white text-xs px-2.5 py-1 rounded-md mr-1">Edit</button>
@@ -1530,7 +1578,22 @@ function applyAdminEmpFilter() {
   renderAdminEmployees();
 }
 
+let _pendingEmpAvatar; // undefined = unchanged, null = remove, string = new photo
+function pickEmployeeAvatar(input) {
+  const file = input.files[0]; if (!file) return;
+  readAvatarFile(file, (dataUrl) => {
+    _pendingEmpAvatar = dataUrl;
+    document.getElementById('fEmpAvatarPreview').innerHTML = avatarHtml({ name: 'x', avatar: dataUrl }, 16);
+  });
+}
+function removeEmployeeAvatar() {
+  _pendingEmpAvatar = null;
+  const name = (document.getElementById('fEmpName').value || '?').trim() || '?';
+  document.getElementById('fEmpAvatarPreview').innerHTML = avatarHtml({ name, avatar: null }, 16);
+}
+
 function openAdminEmployeeModal(id) {
+  _pendingEmpAvatar = undefined;
   const db = getDB();
   const depts = getDepartments();
   const emp = id ? db.users.find(u => u.id === id) : null;
@@ -1542,9 +1605,20 @@ function openAdminEmployeeModal(id) {
         <button onclick="closeModal()" class="text-white/80 hover:text-white">✕</button>
       </div>
       <div class="p-5 grid sm:grid-cols-2 gap-4">
+        <div class="sm:col-span-2 flex items-center gap-4">
+          <div id="fEmpAvatarPreview">${avatarHtml(emp || { name: '?' }, 16)}</div>
+          <div>
+            <label class="inline-block cursor-pointer text-sm bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-medium px-3 py-1.5 rounded-lg">
+              Upload formal picture
+              <input type="file" id="fEmpAvatarFile" accept="image/*" class="hidden" onchange="pickEmployeeAvatar(this)" />
+            </label>
+            <button type="button" onclick="removeEmployeeAvatar()" class="text-xs text-slate-400 hover:text-red-500 ml-2">Remove</button>
+            <p class="text-xs text-slate-400 mt-1">Square-cropped automatically.</p>
+          </div>
+        </div>
         <div class="sm:col-span-2">
           <label class="block text-sm text-slate-500 dark:text-slate-300 mb-1">Full Name</label>
-          <input id="fEmpName" value="${emp ? emp.name : ''}" class="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg px-3 py-2" />
+          <input id="fEmpName" value="${emp ? esc(emp.name) : ''}" class="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg px-3 py-2" />
         </div>
         <div>
           <label class="block text-sm text-slate-500 dark:text-slate-300 mb-1">Department</label>
@@ -1561,7 +1635,7 @@ function openAdminEmployeeModal(id) {
         </div>
         <div class="sm:col-span-2">
           <label class="block text-sm text-slate-500 dark:text-slate-300 mb-1">Job Title</label>
-          <input id="fEmpJobTitle" value="${emp ? emp.jobTitle : ''}" class="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg px-3 py-2" placeholder="e.g. HR Generalist" />
+          <input id="fEmpJobTitle" value="${emp ? esc(emp.jobTitle) : ''}" class="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg px-3 py-2" placeholder="e.g. HR Generalist" />
         </div>
         <div class="sm:col-span-2">
           <label class="block text-sm text-slate-500 dark:text-slate-300 mb-1">Password ${emp ? '(leave blank to keep unchanged)' : ''}</label>
@@ -1588,9 +1662,11 @@ function saveAdminEmployee(id) {
     const u = db.users.find(x => x.id === id);
     Object.assign(u, { name, dept, role, jobTitle });
     if (password) u.password = password;
+    if (_pendingEmpAvatar !== undefined) u.avatar = _pendingEmpAvatar;
   } else {
-    db.users.push({ id: uid('u'), name, dept, role, jobTitle, password: password || 'demo123', avatar: null });
+    db.users.push({ id: uid('u'), name, dept, role, jobTitle, password: password || 'demo123', avatar: _pendingEmpAvatar || null });
   }
+  _pendingEmpAvatar = undefined;
   setDB(db);
   closeModal();
   toast('Employee saved');
@@ -1699,7 +1775,7 @@ function renderAdminCriteria() {
 
     <div class="bg-white dark:bg-slate-800 rounded-xl card-shadow p-5 overflow-x-auto">
       <div class="flex items-center justify-between mb-3">
-        <h3 class="font-semibold text-slate-700 dark:text-slate-200">Rewards &amp; Benefits</h3>
+        <h3 class="font-semibold text-slate-700 dark:text-slate-200">Rewards and Benefits</h3>
         <button onclick="openRewardModal()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-1.5 rounded-md">+ Add Row</button>
       </div>
       <table class="w-full text-sm min-w-[700px]">
@@ -1942,6 +2018,102 @@ function deleteReward(id) {
   renderAdminCriteria();
 }
 
+/* ---------------------- ADMIN: Top Performers ---------------------- */
+function renderAdminTopPerformers() {
+  const admin = currentAdmin(); if (!admin) return;
+  const db = getDB();
+  const tp = db.topPerformers || { period: '', entries: [] };
+  const slots = [0, 1, 2].map(i => tp.entries[i] || { userId: '', score: '', quote: '' });
+  const userOptions = (sel) => `<option value="">— none —</option>` + db.users.map(u => `<option value="${u.id}" ${u.id === sel ? 'selected' : ''}>${esc(u.name)} (${esc(u.jobTitle)})</option>`).join('');
+
+  const slotHtml = slots.map((e, i) => `
+    <div class="border border-slate-200 dark:border-slate-700 rounded-lg p-4 mb-4">
+      <p class="text-sm font-bold mb-3" style="color:${TOP_TIERS[i].text}">${TOP_TIERS[i].label}</p>
+      <div class="grid sm:grid-cols-3 gap-3 mb-3">
+        <div class="sm:col-span-2">
+          <label class="block text-xs text-slate-500 dark:text-slate-300 mb-1">Employee</label>
+          <select id="tpUser${i}" class="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg px-3 py-2 text-sm">${userOptions(e.userId)}</select>
+        </div>
+        <div>
+          <label class="block text-xs text-slate-500 dark:text-slate-300 mb-1">Score (%)</label>
+          <input id="tpScore${i}" type="number" min="0" max="100" step="0.1" value="${e.score}" class="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg px-3 py-2 text-sm" />
+        </div>
+      </div>
+      <label class="block text-xs text-slate-500 dark:text-slate-300 mb-1">Message</label>
+      <textarea id="tpQuote${i}" rows="5" class="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg px-3 py-2 text-sm">${esc(e.quote)}</textarea>
+    </div>`).join('');
+
+  adminShell('toppers', `
+    <div class="flex items-center justify-between mb-2 flex-wrap gap-3">
+      <h1 class="text-xl font-bold text-slate-800 dark:text-slate-100">⭐ Top Performers</h1>
+      <button onclick="fillTopPerformersFromScores()" class="bg-slate-700 hover:bg-slate-800 text-white text-sm font-semibold px-4 py-2 rounded-lg">Fill from highest latest scores</button>
+    </div>
+    <p class="text-sm text-slate-400 mb-5">This is the announcement shown on every member's Home page. The level (e.g. Exceptional Performance) comes from the score and the rating scale.</p>
+    <div class="grid xl:grid-cols-2 gap-6">
+      <div>
+        <div class="mb-4">
+          <label class="block text-xs text-slate-500 dark:text-slate-300 mb-1">Period (shown as “TOP PERFORMERS OF …”)</label>
+          <input id="tpPeriod" value="${esc(tp.period)}" placeholder="e.g. September 2026" class="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg px-3 py-2" />
+        </div>
+        ${slotHtml}
+        <button onclick="saveTopPerformers()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-5 py-2 rounded-lg">Save Top Performers</button>
+      </div>
+      <div>
+        <p class="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2">PREVIEW (saved version)</p>
+        <h3 class="font-bold text-slate-800 dark:text-slate-100 text-sm text-center tracking-wide mb-4">TOP PERFORMERS OF ${esc((tp.period || '').toUpperCase())}</h3>
+        ${topPerformersHtml(db)}
+      </div>
+    </div>
+  `);
+}
+
+function fillTopPerformersFromScores() {
+  const db = getDB();
+  const old = (db.topPerformers && db.topPerformers.entries) || [];
+  const top = leaderboardData(db).slice(0, 3);
+  [0, 1, 2].forEach(i => {
+    const t = top[i];
+    document.getElementById('tpUser' + i).value = t ? t.user.id : '';
+    document.getElementById('tpScore' + i).value = t ? t.ev.finalScore : '';
+    const prev = t ? old.find(e => e.userId === t.user.id) : null;
+    document.getElementById('tpQuote' + i).value = prev ? prev.quote : '';
+  });
+  toast('Filled from latest scores — add messages, then Save');
+}
+
+function saveTopPerformers() {
+  const period = document.getElementById('tpPeriod').value.trim();
+  if (!period) { toast('Enter the period, e.g. September 2026', 'error'); return; }
+  const entries = []; const seen = new Set();
+  for (let i = 0; i < 3; i++) {
+    const userId = document.getElementById('tpUser' + i).value;
+    if (!userId) continue;
+    const score = Number(document.getElementById('tpScore' + i).value);
+    if (document.getElementById('tpScore' + i).value === '' || isNaN(score) || score < 0 || score > 100) { toast(`${TOP_TIERS[i].label}: enter a score from 0 to 100`, 'error'); return; }
+    if (seen.has(userId)) { toast('Each person can only appear once', 'error'); return; }
+    seen.add(userId);
+    entries.push({ userId, score, quote: document.getElementById('tpQuote' + i).value.trim() });
+  }
+  const db = getDB();
+  db.topPerformers = { period, entries };
+  setDB(db);
+  toast('Top Performers saved');
+  renderAdminTopPerformers();
+}
+
+/* ---------------------- ADMIN: Completion Tracker + Leaderboard (same data supervisors see) ---------------------- */
+function renderAdminCompletion() {
+  const admin = currentAdmin(); if (!admin) return;
+  adminShell('completion', completionBody(getDB()));
+}
+
+function renderAdminLeaderboard() {
+  const admin = currentAdmin(); if (!admin) return;
+  const body = leaderboardBody(getDB());
+  adminShell('leaderboard', body.html);
+  drawLeaderboardPie(body.distLabels, body.distData);
+}
+
 /* --- Benefits Description modal --- */
 function openBenefitModal(id) {
   const db = getDB();
@@ -2125,7 +2297,7 @@ function renderAdminEvaluations() {
     <tr class="border-b last:border-0 border-slate-100 dark:border-slate-700">
       <td class="py-2 text-slate-700 dark:text-slate-200">${emp ? emp.name : 'Unknown'}</td>
       <td class="py-2 text-slate-500 dark:text-slate-400">${emp ? deptLabel(emp.dept) : '-'}</td>
-      <td class="py-2 text-slate-500 dark:text-slate-400">${evaluator ? evaluator.name : 'Unknown'}</td>
+      <td class="py-2 text-slate-500 dark:text-slate-400">${evaluator ? esc(evaluator.name) : 'Unknown'}${isSelfEval(ev) ? ' <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300">self</span>' : ''}</td>
       <td class="py-2"><span class="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300 px-2 py-0.5 rounded font-semibold text-xs">${ev.finalScore}%</span></td>
       <td class="py-2 text-slate-500 dark:text-slate-400 text-xs">${ev.level}</td>
       <td class="py-2 text-slate-500 dark:text-slate-400">${ev.date}</td>
@@ -2180,7 +2352,7 @@ function viewAdminEvaluation(evalId) {
       <div class="p-5 overflow-y-auto grid md:grid-cols-2 gap-6">
         <div>
           <p class="text-sm text-slate-700 dark:text-slate-200"><strong>Employee:</strong> ${emp ? esc(emp.name) : 'Unknown'}</p>
-          <p class="text-sm text-slate-700 dark:text-slate-200"><strong>Evaluator:</strong> ${evaluator ? esc(evaluator.name) : 'Unknown'}</p>
+          <p class="text-sm text-slate-700 dark:text-slate-200"><strong>Evaluator:</strong> ${evaluator ? esc(evaluator.name) : 'Unknown'}${isSelfEval(ev) ? ' (self-evaluation)' : ''}</p>
           <p class="text-sm text-slate-700 dark:text-slate-200 mb-3"><strong>Date:</strong> ${ev.date} &middot; ${ev.time}</p>
           <table class="w-full text-sm mb-3">${rows}</table>
           ${ev.comment ? `<div class="mb-3 text-sm"><p class="font-semibold text-slate-600 dark:text-slate-300 mb-1">Additional comments</p><p class="text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700/50 rounded-lg p-3 whitespace-pre-line">${esc(ev.comment)}</p></div>` : ''}

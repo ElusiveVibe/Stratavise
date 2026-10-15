@@ -34,7 +34,7 @@ password **`demo123`** and you're signed straight in (no admin step needed).
 | Joseph Benedict L. Gerero | IT / MIS | IT Support | Employee |
 | Shaira B. Sauquillo | Sales | Sales Consultant | Employee |
 
-Formal pictures live in `assets/avatars/`. Everyone in the team can evaluate everyone else
+Formal pictures live in `assets/avatars/`. Everyone in the team can evaluate everyone else, and themselves
 (the roster has about one person per department), and only supervisors see the Leaderboard
 and Completion Tracker.
 
@@ -48,20 +48,23 @@ and Completion Tracker.
   rewards and benefits, benefits description.
 - **Progress Tracker**: Last Evaluation (table + radar chart + overall) and All-time Evaluation with
   Sept 25 2026, Jun 26 2026, Mar 27 2026, Dec 26 2025, Sept 26 2025.
-- **Completion Tracker** shows Completed / Pending / Not Yet Started.
+- **Completion Tracker** shows Completed / Pending / Not Yet Started for **every member** (supervisors and employees).
+- **Self-evaluation**: your own profile is the first card on Evaluate (tagged "You · Self-evaluation"). Self-evaluations are tagged *Self* in Progress Tracker and in the admin evaluation list, and count toward the Completion Tracker (6 evaluations per person: 5 colleagues + yourself).
 
 ## Do the charts and data move when we evaluate?
 Yes. Submitting an evaluation immediately updates: the evaluated person's **Progress Tracker** (new "last
 evaluation" + a new all-time card), the **Leaderboard** and its pie chart, and the **Completion Tracker**
-(Not Yet Started → Pending → Completed; it counts the current calendar month). The *Top Performers of
-September 2026* on Home is a fixed announcement and does not change.
+(Not Yet Started → Pending → Completed; it counts the current calendar month). The *Top Performers* on Home is an announcement the Administrator edits (Admin → Top Performers); it does not change on its own.
 
 ## What the Administrator can do
 Everything, end to end:
 - **Manage Employees** — add, edit, or delete any supervisor/employee in any department; reassign department, role, job title; reset passwords.
 - **Criteria & Scoring** — add/edit/delete evaluation criteria, their weights (live check that they total 100%) and their questions (one per line, `English || Filipino`), edit the performance rating scale tiers, the rewards & benefits table, and the benefits description table.
 - **Departments** — add, rename, or delete departments (icon + color), with a safety check so a department in use can't be deleted out from under its staff.
-- **All Evaluations** — view and delete any evaluation submitted company-wide, filterable by department.
+- **All Evaluations** — view and delete any evaluation submitted company-wide, filterable by department. Evaluation detail also shows the evaluator's additional comments.
+- **Top Performers** — choose who is featured on the Home page (Top 1–3), their score and their message, and the period title. "Fill from highest latest scores" picks the current top 3 for you.
+- **Completion Tracker** and **Leaderboard** — the same views supervisors see (Completed / Pending / Not Yet Started, ranking with Excel/PDF export).
+- **Employee photos** — upload or remove a formal picture for anyone from Manage Employees (auto square-cropped and shrunk).
 
 ## How scoring works
 Each criterion (editable by the admin) has a weight and several questions; every question is answered 1–5,
