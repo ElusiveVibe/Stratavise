@@ -359,10 +359,8 @@ function navItems(role) {
     { key: 'evaluate', label: 'Evaluate', icon: '📝' },
     { key: 'progress', label: 'Progress Tracker', icon: '📈' }
   ];
-  if (role === 'supervisor') {
-    base.push({ key: 'leaderboard', label: 'Leaderboard', icon: '🏆' });
-    base.push({ key: 'completion', label: 'Completion Tracker', icon: '✅' });
-  }
+  if (role === 'supervisor') base.push({ key: 'leaderboard', label: 'Leaderboard', icon: '🏆' });
+  base.push({ key: 'completion', label: 'Completion Tracker', icon: '✅' }); // visible to everyone
   base.push({ key: 'help', label: 'Help & Feedback', icon: '💬' });
   base.push({ key: 'settings', label: 'Settings', icon: '⚙️' });
   return base;
@@ -1396,7 +1394,6 @@ function completionBody(db) {
 
 function renderCompletionTracker() {
   const user = currentUser(); if (!user) return;
-  if (user.role !== 'supervisor') { location.hash = '#/home'; return; }
   sidebarShell('completion', completionBody(getDB()));
 }
 
