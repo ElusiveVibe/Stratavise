@@ -35,7 +35,7 @@ password **`demo123`** and you're signed straight in (no admin step needed).
 | Shaira B. Sauquillo | Sales | Sales Consultant | Employee |
 
 Formal pictures live in `assets/avatars/`. Everyone in the team can evaluate everyone else, and themselves (the roster has about one person per
-department). Everyone can see the Completion Tracker; only supervisors see the Leaderboard.
+department). Only supervisors (and the Administrator) see the Completion Tracker and the Leaderboard; the tracker lists every member, employees included.
 
 ## What changed in this update (from the drive)
 - **S logo** replaces the 📈 icon everywhere (`assets/logo-s.png`, favicon too).
