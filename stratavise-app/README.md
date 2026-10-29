@@ -5,24 +5,28 @@ A fully working build of the Stratavise flow from your wireframes, now with a fu
 name/password sign-in for staff, or a dedicated Administrator login with complete
 control over employees, criteria/scoring, departments, and every evaluation.
 
-**Zero-backend build** — static site (no npm install, no build step), all data lives in
-the browser's `localStorage`. Deploys to Vercel instantly with no config. Data won't sync
-across devices — if you want shared, persistent data across your whole team, say the word
-and I'll wire this up to a real database (Postgres via Vercel/Neon/Supabase); the UI won't
-need to change much.
+**Static site + one small Vercel API.** No build step. Data is saved in the browser *and*
+synced to a cloud database (Upstash Redis on Vercel) so every device sees the same data —
+see **Cloud sync (Vercel)** below. If the database isn't connected, the app still works in
+"Local only" mode (data stays in that browser).
 
 ## Logging in
 
-**Staff (Supervisor/Employee):** from the main sign-in screen, pick a department → pick
-Supervisor or Employee → type a name (autocomplete will suggest matches) → password
-**`demo123`** for everyone below.
+**Staff (Supervisor/Employee):** pick a department → pick Supervisor or Employee → type a
+name (autocomplete suggests matches) → password. The roster accounts below were created with
+a starter password; change it from **Settings**, or let the Administrator reset it in
+**Manage Employees**. Sign-in screens no longer show any demo credentials.
 
-**Administrator:** click "🔐 Sign in as Administrator" at the bottom of the department
-screen. Username **`admin`**, password **`admin123`**.
+**Administrator:** "🔐 Sign in as Administrator" at the bottom of the department screen.
+Change the starter admin password right away in **Admin → Settings** (a warning shows until you do).
 
-**New employee?** Click "+ New Employee? Create an Account" on the department screen —
-fill in name, department, position, and job title, and the account is created with
-password **`demo123`** and you're signed straight in (no admin step needed).
+**New user?** "+ New Employee? Request an Account" → fill in the form, create a password, read
+and accept the **Terms & Conditions**. The account is **not** created yet: the user must
+coordinate with the company and pay first. The Administrator sees a **New Account Request**
+notification, marks the payment as received, then **Approves** (the person is added to
+Employees/Supervisors) or **Declines**. New users can check progress with
+"Check my account request status". The terms and payment instructions are editable in
+**Admin → Account Requests → Terms & payment instructions**.
 
 ## The roster (from your org chart + formal pictures)
 | Name | Department | Job title | Role |
@@ -91,25 +95,53 @@ vercel --prod
 3. Framework preset: **Other** (it's static — no build command / output directory needed).
 4. Deploy.
 
+## Cloud sync (Vercel) — so data is the same on every device
+`api/db.js` is a Vercel Serverless Function that keeps the whole database as one JSON
+document in **Upstash Redis**. The browser saves locally first, then syncs automatically
+(on every change, when the tab regains focus, and every 30 s). Edits from different people
+are merged per record, so two people evaluating at the same time don't overwrite each other.
+The header shows ☁️ Synced / ⟳ Syncing / ⚠️ Offline / 💾 Local only.
+
+**One-time setup**
+1. Deploy this folder to Vercel (steps below).
+2. Vercel dashboard → your project → **Storage** → **Create Database / Marketplace** → **Upstash Redis** (free plan is fine) → connect it to the project. Vercel adds `KV_REST_API_URL` and `KV_REST_API_TOKEN` automatically (`UPSTASH_REDIS_REST_*` also work).
+3. **Redeploy** the project so the function can see the new variables.
+4. Open `https://<your-site>/api/db` — it should show `{"configured":true,...}`.
+5. Open the site **first on the device that has the data you want to keep** (the laptop). Its data is uploaded to the cloud; every other device then downloads it.
+
+Good to know
+- No database connected (or opened via `file://`) = Local only; nothing breaks.
+- Each open tab checks for changes about every 30 s, which fits the Upstash free tier for a small team.
+- Profile photos are stored inside the database (resized to 256 px). Fine for a small company; keep photos small if you have 100+ users.
+- **Admin → Settings → Download backup (JSON)** saves a full copy of the data.
+- To fully reset: delete the keys `stratavise:db` and `stratavise:version` in the Upstash console **and** run `localStorage.clear()` on every device (a device that still has data will otherwise re-upload it).
+- Security note: passwords are now stored as salted hashes (never plain text), but `/api/db` itself is not login-protected, so don't put sensitive data in it. For real production use, the next step is server-side login (sessions) so the API only answers signed-in users.
+
+## Notifications (🔔 bell, top right)
+- **Employees & Supervisors:** "Time to evaluate! You have a week to evaluate from (November 02 to 08, 2026)" · "A new update on the website was made." · admin announcements.
+- **Admin:** "Time to notify employees about their evaluation." (appears a week before the evaluation week — first Monday–Sunday of the month) · "Someone from the … Department has sent feedback. [Click to check]" · "New Account Request … [Review]".
+- Admin sends the evaluation notice / general announcements in **Admin → Announcements**. The "website update" notice is automatic: change `APP_VERSION` (and `APP_UPDATE_MESSAGE`) in `sync.js` whenever you publish an update.
+
 ## What's included
 - `assets/` — logo and formal pictures
 - `index.html` — shell: Tailwind (CDN, dark-mode enabled), Chart.js, SheetJS, jsPDF
-- `app.js` — the whole app:
+- `sync.js` — password hashing, notification helpers, cloud-sync engine
+- `extras.js` — notification bell, Admin Feedback / Account Requests / Announcements / Settings, account-request flow
+- `api/db.js` — Vercel function (Upstash Redis)
+- `app.js` — the main app:
   - Staff sign-in (department → position → searchable name + password) and a separate Administrator sign-in
   - Home — welcome panel, Top Employees of the month, appraisal period summary
   - Performance and Rewards — criteria, rating scale, rewards & benefits, benefits description (read-only for staff, editable by the admin)
   - Evaluate — choose a colleague, rate every criterion, weighted final score + success confirmation
   - Progress Tracker — Last Evaluation (table + radar chart) and All-time Evaluation history
   - Leaderboard (supervisor) — ranked table + performance-level pie chart + Excel/PDF export
-  - Completion Tracker (supervisor) — each supervisor's evaluation completion status
+  - Completion Tracker (supervisor) — each member's evaluation completion status
   - Help & Feedback — mood rating + comment, with history
   - Settings — profile picture upload, change password, light/dark mode toggle, logout
-  - **Administrator** — Dashboard, Manage Employees, Criteria & Scoring, Departments, All Evaluations (full CRUD on everything above)
+  - **Administrator** — Dashboard, Manage Employees, Criteria & Scoring, Departments, All Evaluations, Top Performers, Completion Tracker, Leaderboard, **Account Requests, Feedback, Announcements, Settings**
 
-> Data now lives under a new storage key (`stratavise_db_v2`), so browsers that used the old version start fresh with this roster.
-
-## Resetting the demo data
-In the browser console on the site:
+## Resetting this browser's data
+In the browser console on the site (see the sync note above if the cloud is connected):
 ```js
 localStorage.clear(); location.reload();
 ```

@@ -86,7 +86,7 @@ function seedDB() {
     { id: 'u_samjean', name: 'Sam Jean N. Satam', dept: 'it', role: 'supervisor', jobTitle: 'Web Developer' },
     { id: 'u_joseph', name: 'Joseph Benedict L. Gerero', dept: 'it', role: 'employee', jobTitle: 'IT Support' },
     { id: 'u_shaira', name: 'Shaira B. Sauquillo', dept: 'sales', role: 'employee', jobTitle: 'Sales Consultant' }
-  ].map(u => ({ ...u, password: 'demo123', avatar: 'assets/avatars/' + u.id + '.jpg' }));
+  ].map(u => setPw({ ...u, avatar: 'assets/avatars/' + u.id + '.jpg' }, 'demo123', u.id));
 
   // Weights + questions (English with Filipino translation) from the Evaluation Questions file.
   const criteria = [
@@ -127,39 +127,39 @@ function seedDB() {
   ].map(c => ({ ...c, questions: c.questions.map((q, i) => ({ id: c.id + 'q' + (i + 1), en: q.en, tl: q.tl })) }));
 
   const ratingScale = [
-    { id: uid('rs'), min: 97, max: 100, label: 'Exceptional Performance' },
-    { id: uid('rs'), min: 93, max: 96, label: 'Outstanding Performance' },
-    { id: uid('rs'), min: 89, max: 92, label: 'Exceeds Expectations' },
-    { id: uid('rs'), min: 85, max: 88, label: 'Highly Satisfactory' },
-    { id: uid('rs'), min: 80, max: 84, label: 'Satisfactory' },
-    { id: uid('rs'), min: 75, max: 79, label: 'Needs Improvement' },
-    { id: uid('rs'), min: 0, max: 74, label: 'Unsatisfactory' }
+    { id: 'rs1', min: 97, max: 100, label: 'Exceptional Performance' },
+    { id: 'rs2', min: 93, max: 96, label: 'Outstanding Performance' },
+    { id: 'rs3', min: 89, max: 92, label: 'Exceeds Expectations' },
+    { id: 'rs4', min: 85, max: 88, label: 'Highly Satisfactory' },
+    { id: 'rs5', min: 80, max: 84, label: 'Satisfactory' },
+    { id: 'rs6', min: 75, max: 79, label: 'Needs Improvement' },
+    { id: 'rs7', min: 0, max: 74, label: 'Unsatisfactory' }
   ];
 
   const rewards = [
-    { id: uid('rw'), level: 'Exceptional Performance', benefits: 'Performance Bonus, Additional Leave Credits, Promotion Priority, Leadership Training', desc: 'Consistently exceeds expectations and demonstrates outstanding contribution to company goals.' },
-    { id: uid('rw'), level: 'Outstanding Performance', benefits: 'Performance Bonus, Additional Leave Credits, Recognition Award', desc: 'Regularly exceeds expectations and delivers quality results.' },
-    { id: uid('rw'), level: 'Exceeds Expectations', benefits: 'Performance Incentive, Company-Paid Training, Recognition Certificate', desc: 'Performs above standards and contributes positively to team performance.' },
-    { id: uid('rw'), level: 'Highly Satisfactory', benefits: 'Training Assistance, Career Development Opportunities', desc: 'Meets all standards and shows potential for growth.' },
-    { id: uid('rw'), level: 'Satisfactory', benefits: 'Eligibility for Regular Company Benefits and Salary Review', desc: 'Consistently meets job requirements and expectations.' },
-    { id: uid('rw'), level: 'Needs Improvement', benefits: 'Coaching and Development Plan', desc: 'Improvement is needed in certain performance areas.' },
-    { id: uid('rw'), level: 'Unsatisfactory', benefits: 'Performance Improvement Plan (PIP) and Monthly Coaching', desc: 'Performance falls below company standards and requires immediate improvement.' }
+    { id: 'rw1', level: 'Exceptional Performance', benefits: 'Performance Bonus, Additional Leave Credits, Promotion Priority, Leadership Training', desc: 'Consistently exceeds expectations and demonstrates outstanding contribution to company goals.' },
+    { id: 'rw2', level: 'Outstanding Performance', benefits: 'Performance Bonus, Additional Leave Credits, Recognition Award', desc: 'Regularly exceeds expectations and delivers quality results.' },
+    { id: 'rw3', level: 'Exceeds Expectations', benefits: 'Performance Incentive, Company-Paid Training, Recognition Certificate', desc: 'Performs above standards and contributes positively to team performance.' },
+    { id: 'rw4', level: 'Highly Satisfactory', benefits: 'Training Assistance, Career Development Opportunities', desc: 'Meets all standards and shows potential for growth.' },
+    { id: 'rw5', level: 'Satisfactory', benefits: 'Eligibility for Regular Company Benefits and Salary Review', desc: 'Consistently meets job requirements and expectations.' },
+    { id: 'rw6', level: 'Needs Improvement', benefits: 'Coaching and Development Plan', desc: 'Improvement is needed in certain performance areas.' },
+    { id: 'rw7', level: 'Unsatisfactory', benefits: 'Performance Improvement Plan (PIP) and Monthly Coaching', desc: 'Performance falls below company standards and requires immediate improvement.' }
   ];
 
   // "Benefits Description" table (from the Incentives Description screenshot).
   const benefits = [
-    { id: uid('bd'), benefit: 'Performance Bonus', desc: 'Additional monetary reward based on performance results and company performance.' },
-    { id: uid('bd'), benefit: 'Performance Incentive', desc: 'One-time cash reward for above-average performance.' },
-    { id: uid('bd'), benefit: 'Additional Leave Credits', desc: 'Additional paid leave days granted as a reward for exceptional performance.' },
-    { id: uid('bd'), benefit: 'Leadership Training', desc: 'Specialized training for employees being prepared for higher positions.' },
-    { id: uid('bd'), benefit: 'Promotion Priority', desc: 'First consideration for available promotion opportunities.' },
-    { id: uid('bd'), benefit: 'Recognition Award', desc: 'Formal recognition through certificates, awards, or company events.' },
-    { id: uid('bd'), benefit: 'Company-Paid Training', desc: 'Professional development programs funded by the company.' },
-    { id: uid('bd'), benefit: 'Performance Improvement Plan (PIP)', desc: 'Structured action plan designed to improve employee performance within a specified period.' }
+    { id: 'bd1', benefit: 'Performance Bonus', desc: 'Additional monetary reward based on performance results and company performance.' },
+    { id: 'bd2', benefit: 'Performance Incentive', desc: 'One-time cash reward for above-average performance.' },
+    { id: 'bd3', benefit: 'Additional Leave Credits', desc: 'Additional paid leave days granted as a reward for exceptional performance.' },
+    { id: 'bd4', benefit: 'Leadership Training', desc: 'Specialized training for employees being prepared for higher positions.' },
+    { id: 'bd5', benefit: 'Promotion Priority', desc: 'First consideration for available promotion opportunities.' },
+    { id: 'bd6', benefit: 'Recognition Award', desc: 'Formal recognition through certificates, awards, or company events.' },
+    { id: 'bd7', benefit: 'Company-Paid Training', desc: 'Professional development programs funded by the company.' },
+    { id: 'bd8', benefit: 'Performance Improvement Plan (PIP)', desc: 'Structured action plan designed to improve employee performance within a specified period.' }
   ];
 
   const admins = [
-    { id: 'admin1', username: 'admin', password: 'admin123', displayName: 'Administrator' }
+    setPw({ id: 'admin1', username: 'admin', displayName: 'Administrator' }, 'admin123', 'admin1')
   ];
 
   /* ---- Past appraisal history (drives Progress Tracker → All-time Evaluation) ----
@@ -197,7 +197,7 @@ function seedDB() {
       const finalScore = Math.round(criteria.reduce((a, c) => a + (ratings[c.id] / 5) * c.weight, 0) * 10) / 10;
       const dt = cycleDates[i];
       evaluations.push({
-        id: uid('ev'), employeeId: userId, evaluatorId: evaluatorFor(userId, i), ts: dt.getTime(),
+        id: 'ev_seed_' + userId + '_' + i, employeeId: userId, evaluatorId: evaluatorFor(userId, i), ts: dt.getTime(),
         date: dt.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: '2-digit' }),
         time: dt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
         ratings, comment: '', finalScore, level: levelFrom(finalScore)
@@ -232,13 +232,19 @@ function seedDB() {
 function getDB() {
   try {
     const raw = localStorage.getItem(DB_KEY);
-    if (!raw) { const seeded = seedDB(); localStorage.setItem(DB_KEY, JSON.stringify(seeded)); return seeded; }
-    return JSON.parse(raw);
+    if (!raw) { const seeded = ensureShape(seedDB()).db; writeLocalRaw(seeded); return seeded; }
+    const r = ensureShape(JSON.parse(raw));
+    if (r.changed) { writeLocalRaw(r.db); markDirty(); }
+    return r.db;
   } catch (e) {
-    const seeded = seedDB(); localStorage.setItem(DB_KEY, JSON.stringify(seeded)); return seeded;
+    const seeded = ensureShape(seedDB()).db; writeLocalRaw(seeded); return seeded;
   }
 }
-function setDB(db) { localStorage.setItem(DB_KEY, JSON.stringify(db)); }
+function setDB(db) {
+  try { localStorage.setItem(DB_KEY, JSON.stringify(db)); }
+  catch (e) { toast('Browser storage is full — remove some profile photos.', 'error'); return; }
+  markDirty();
+}
 
 /* ---------------------- Session ---------------------- */
 // session shape: { type: 'staff', userId } for Supervisor/Employee, or { type: 'admin', adminId } for the Administrator
@@ -274,7 +280,10 @@ function router() {
   if (session && session.type === 'admin' && segs[0] !== 'admin') { location.hash = '#/admin'; return; }
   if (session && session.type === 'staff' && segs[0] === 'admin') { location.hash = '#/home'; return; }
 
+  if (session) runAutoNotifs();
+
   if (segs[0] === 'login') {
+    if (segs[1] === 'status') return renderRequestStatus();
     if (segs[1] === 'admin') return renderAdminLogin();
     if (segs[1] === 'register') return renderRegister();
     if (segs[1] === 'position') return renderLoginPosition(segs[2]);
@@ -289,6 +298,10 @@ function router() {
     if (segs[1] === 'toppers') return renderAdminTopPerformers();
     if (segs[1] === 'completion') return renderAdminCompletion();
     if (segs[1] === 'leaderboard') return renderAdminLeaderboard();
+    if (segs[1] === 'feedback') return renderAdminFeedback();
+    if (segs[1] === 'requests') return renderAdminRequests();
+    if (segs[1] === 'announcements') return renderAdminAnnouncements();
+    if (segs[1] === 'settings') return renderAdminSettings();
     return renderAdminDashboard();
   }
   if (segs[0] === 'home') return renderHome();
@@ -305,7 +318,7 @@ function router() {
 }
 
 window.addEventListener('hashchange', router);
-window.addEventListener('DOMContentLoaded', () => { getDB(); router(); });
+window.addEventListener('DOMContentLoaded', () => { getDB(); runAutoNotifs(); router(); syncInit(); });
 
 /* ---------------------- Shared UI shell ---------------------- */
 function appRoot() { return document.getElementById('app'); }
@@ -331,10 +344,10 @@ function readAvatarFile(file, cb) {
       const side = Math.min(img.width, img.height);
       const sx = (img.width - side) / 2;
       const sy = img.height > img.width ? 0 : (img.height - side) / 2; // keep the top (faces) for portrait photos
-      const out = Math.min(480, side);
+      const out = Math.min(256, side);
       const canvas = document.createElement('canvas'); canvas.width = out; canvas.height = out;
       canvas.getContext('2d').drawImage(img, sx, sy, side, side, 0, 0, out, out);
-      cb(canvas.toDataURL('image/jpeg', 0.85));
+      cb(canvas.toDataURL('image/jpeg', 0.78));
     };
     img.onerror = () => toast('Could not read that image', 'error');
     img.src = reader.result;
@@ -379,8 +392,8 @@ function sidebarShell(activeKey, innerHtml) {
       <div class="p-4 border-b border-slate-200 dark:border-slate-700 flex items-center gap-3">
         ${avatarHtml(user, 11)}
         <div class="min-w-0">
-          <p class="font-semibold text-slate-800 dark:text-slate-100 text-sm truncate">${user.name}</p>
-          <p class="text-xs text-slate-400 truncate">${deptLabel(user.dept)} &middot; ${user.jobTitle}</p>
+          <p class="font-semibold text-slate-800 dark:text-slate-100 text-sm truncate">${esc(user.name)}</p>
+          <p class="text-xs text-slate-400 truncate">${esc(deptLabel(user.dept))} &middot; ${esc(user.jobTitle)}</p>
         </div>
       </div>
       <nav class="flex-1 py-2">
@@ -398,6 +411,7 @@ function sidebarShell(activeKey, innerHtml) {
         <div class="flex items-center gap-2 font-bold text-lg">
           ${brandHtml()}
         </div>
+        ${headerToolsHtml()}
       </div>
       ${innerHtml}
     </main>
@@ -444,7 +458,8 @@ function renderLoginDept() {
     <p class="text-slate-400 text-center mb-8">to continue to evaluate</p>
     <div class="flex flex-wrap justify-center gap-4">${cards}</div>
     <div class="text-center mt-6">
-      <button onclick="location.hash='#/login/register'" class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold px-5 py-2.5 rounded-lg">+ New Employee? Create an Account</button>
+      <button onclick="location.hash='#/login/register'" class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold px-5 py-2.5 rounded-lg">+ New Employee? Request an Account</button>
+      <div class="mt-2"><button onclick="location.hash='#/login/status'" class="text-xs text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400">Check my account request status</button></div>
     </div>
     <div class="text-center mt-5 pt-5 border-t border-slate-100 dark:border-slate-700">
       <button onclick="location.hash='#/login/admin'" class="text-sm text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 font-medium">🔐 Sign in as Administrator</button>
@@ -453,72 +468,6 @@ function renderLoginDept() {
 }
 
 /* ---------------------- LOGIN: New Employee Self-Registration ---------------------- */
-function renderRegister() {
-  const depts = getDepartments();
-  authShell(`
-    <button onclick="location.hash='#/login'" class="text-sm text-slate-400 hover:text-slate-600 mb-4">&larr; Back</button>
-    <div class="text-center mb-6">
-      <div class="text-4xl mb-2">🆕</div>
-      <h1 class="text-2xl font-bold text-slate-800 dark:text-slate-100">Create Your Account</h1>
-      <p class="text-slate-400 text-sm">Your password will be set to <strong>demo123</strong> — you can change it later in Settings.</p>
-    </div>
-    <div class="max-w-sm mx-auto space-y-3">
-      <div>
-        <label class="block text-sm text-slate-500 dark:text-slate-300 mb-1">Full Name</label>
-        <input id="regName" class="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg px-3 py-2" placeholder="e.g. Juan Dela Cruz" />
-      </div>
-      <div>
-        <label class="block text-sm text-slate-500 dark:text-slate-300 mb-1">Department</label>
-        <select id="regDept" class="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg px-3 py-2">
-          ${depts.map(d => `<option value="${d.key}">${d.label}</option>`).join('')}
-        </select>
-      </div>
-      <div>
-        <label class="block text-sm text-slate-500 dark:text-slate-300 mb-1">Position</label>
-        <select id="regRole" class="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg px-3 py-2">
-          <option value="employee">Employee</option>
-          <option value="supervisor">Supervisor</option>
-        </select>
-      </div>
-      <div>
-        <label class="block text-sm text-slate-500 dark:text-slate-300 mb-1">Job Title</label>
-        <input id="regJobTitle" class="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg px-3 py-2" placeholder="e.g. Marketing Associate" />
-      </div>
-      <p id="regError" class="text-red-500 text-sm hidden"></p>
-      <button onclick="submitRegister()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 rounded-lg transition mt-2">Create Account &amp; Sign In</button>
-    </div>
-  `);
-}
-
-function submitRegister() {
-  const name = document.getElementById('regName').value.trim();
-  const dept = document.getElementById('regDept').value;
-  const role = document.getElementById('regRole').value;
-  const jobTitle = document.getElementById('regJobTitle').value.trim();
-  const err = document.getElementById('regError');
-
-  if (!name || !jobTitle) {
-    err.textContent = 'Please fill in your name and job title.';
-    err.classList.remove('hidden');
-    return;
-  }
-  const db = getDB();
-  const dupe = db.users.find(u => u.dept === dept && u.role === role && u.name.toLowerCase() === name.toLowerCase());
-  if (dupe) {
-    err.textContent = 'Someone with that name already has an account in this department/position. Try adding a middle initial.';
-    err.classList.remove('hidden');
-    return;
-  }
-
-  const newUser = { id: uid('u'), name, dept, role, jobTitle, password: 'demo123', avatar: null };
-  db.users.push(newUser);
-  setDB(db);
-
-  setSession({ type: 'staff', userId: newUser.id });
-  toast(`Welcome, ${name.split(' ')[0]}! Your password is demo123.`);
-  location.hash = '#/home';
-}
-
 /* ---------------------- LOGIN: Step 2 - Choose Position ---------------------- */
 function renderLoginPosition(dept) {
   if (!deptMeta(dept) || !getDepartments().find(d => d.key === dept)) { location.hash = '#/login'; return; }
@@ -563,10 +512,6 @@ function renderLoginCredentials(dept, role) {
       <input id="loginPasswordInput" type="password" placeholder="Enter password" class="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg px-3 py-2 mb-2" />
       <p id="loginCredError" class="text-red-500 text-sm hidden mb-2">Name not found or password incorrect.</p>
       <button onclick="submitLogin('${dept}','${role}')" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 rounded-lg transition">Login</button>
-      <div class="mt-5 text-xs text-slate-400 bg-slate-50 dark:bg-slate-700/50 rounded-lg p-3 leading-relaxed">
-        Demo accounts in this department/role (data lives in this browser only). Password for every seeded account: <strong>demo123</strong><br/>
-        ${candidates.map(c => `&bull; ${c.name}`).join('<br/>') || '<em>No seeded accounts for this combination.</em>'}
-      </div>
     </div>
   `);
 
@@ -580,7 +525,7 @@ function renderLoginCredentials(dept, role) {
     if (!q) { box.classList.add('hidden'); box.innerHTML = ''; return; }
     const matches = candidates.filter(c => c.name.toLowerCase().includes(q));
     if (!matches.length) { box.innerHTML = `<div class="px-3 py-2 text-slate-400 text-sm">No matches</div>`; box.classList.remove('hidden'); return; }
-    box.innerHTML = matches.map(m => `<div data-id="${m.id}" class="suggestionRow px-3 py-2 text-sm hover:bg-emerald-50 dark:hover:bg-emerald-900/40 cursor-pointer text-slate-700 dark:text-slate-200">${m.name}</div>`).join('');
+    box.innerHTML = matches.map(m => `<div data-id="${m.id}" class="suggestionRow px-3 py-2 text-sm hover:bg-emerald-50 dark:hover:bg-emerald-900/40 cursor-pointer text-slate-700 dark:text-slate-200">${esc(m.name)}</div>`).join('');
     box.classList.remove('hidden');
     box.querySelectorAll('.suggestionRow').forEach(row => {
       row.addEventListener('click', () => {
@@ -604,7 +549,9 @@ function submitLogin(dept, role) {
   const db = getDB();
   const user = db.users.find(u => u.dept === dept && u.role === role && u.name.toLowerCase() === name.toLowerCase());
   const err = document.getElementById('loginCredError');
-  if (!user || user.password !== password) {
+  if (!user || !checkPw(user, password)) {
+    const pend = (db.accountRequests || []).find(r => r.status === 'pending' && r.name.toLowerCase() === name.toLowerCase() && checkPw(r, password));
+    err.textContent = pend ? 'Your account request is still pending approval and payment confirmation. Please coordinate with the company.' : 'Name not found or password incorrect.';
     err.classList.remove('hidden');
     return;
   }
@@ -629,9 +576,6 @@ function renderAdminLogin() {
       <input id="adminPasswordInput" type="password" autocomplete="current-password" class="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg px-3 py-2 mb-2" placeholder="Enter password" />
       <p id="adminLoginError" class="text-red-500 text-sm hidden mb-2">Incorrect username or password.</p>
       <button onclick="submitAdminLogin()" class="w-full bg-slate-800 hover:bg-slate-900 text-white font-semibold py-2.5 rounded-lg transition">Sign In</button>
-      <div class="mt-5 text-xs text-slate-400 bg-slate-50 dark:bg-slate-700/50 rounded-lg p-3 leading-relaxed text-center">
-        Demo admin account: <strong>admin</strong> / <strong>admin123</strong>
-      </div>
     </div>
   `);
   document.getElementById('adminPasswordInput').addEventListener('keyup', (e) => { if (e.key === 'Enter') submitAdminLogin(); });
@@ -641,10 +585,11 @@ function submitAdminLogin() {
   const username = document.getElementById('adminUsernameInput').value.trim();
   const password = document.getElementById('adminPasswordInput').value;
   const db = getDB();
-  const admin = db.admins.find(a => a.username.toLowerCase() === username.toLowerCase() && a.password === password);
+  const admin = db.admins.find(a => a.username.toLowerCase() === username.toLowerCase() && checkPw(a, password));
   const err = document.getElementById('adminLoginError');
   if (!admin) { err.classList.remove('hidden'); return; }
   setSession({ type: 'admin', adminId: admin.id });
+  runAutoNotifs();
   toast(`Welcome back, ${admin.displayName}!`);
   location.hash = '#/admin';
 }
@@ -853,6 +798,7 @@ function renderEvaluateChoose() {
 
   sidebarShell('evaluate', `
     <h1 class="text-xl font-bold text-slate-800 dark:text-slate-100 mb-4">Choose who to evaluate</h1>
+    ${evalWindowBanner()}
     <div class="relative max-w-md mb-5">
       <input id="evalSearchInput" value="${esc(_evalSearch)}" placeholder="Search Bar" class="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white rounded-lg px-3 py-2 pr-9" />
       <span class="absolute right-3 top-2.5 text-slate-400">🔍</span>
@@ -1148,7 +1094,8 @@ function sendFeedback() {
   if (!_selectedMood) { toast('Please select how we did', 'error'); return; }
   const user = currentUser();
   const db = getDB();
-  db.feedback.push({ id: uid('fb'), userId: user.id, mood: _selectedMood, comment: document.getElementById('feedbackComment').value.trim(), date: nowDate() });
+  db.feedback.push({ id: uid('fb'), userId: user.id, userName: user.name, dept: user.dept, mood: _selectedMood, comment: document.getElementById('feedbackComment').value.trim(), date: nowDate(), ts: Date.now(), readBy: [] });
+  pushNotif(db, { audience: 'admin', type: 'feedback', title: 'Someone from the ' + deptLabel(user.dept) + ' Department has sent feedback.', actionLabel: 'Click to check', link: '#/admin/feedback' });
   setDB(db);
   toast('Thank you for your feedback!');
   renderHelpFeedback();
@@ -1165,7 +1112,7 @@ function renderFeedbackHistory() {
     <div class="bg-white dark:bg-slate-800 rounded-lg card-shadow p-3 text-sm">
       <span class="font-medium text-slate-700 dark:text-slate-200">${moodEmoji[f.mood]}</span>
       <span class="text-slate-400 text-xs"> &middot; ${f.date}</span>
-      ${f.comment ? `<p class="text-slate-500 dark:text-slate-400 mt-1">${f.comment}</p>` : ''}
+      ${f.comment ? `<p class="text-slate-500 dark:text-slate-400 mt-1">${esc(f.comment)}</p>` : ''}
     </div>`).join('') || `<p class="text-slate-400 text-sm">No feedback submitted yet.</p>`;
 }
 
@@ -1179,8 +1126,8 @@ function renderSettings() {
       <h1 class="text-xl font-bold text-slate-800 dark:text-slate-100 mb-5">⚙️ Settings</h1>
       <div class="bg-white dark:bg-slate-800 rounded-xl card-shadow p-6 text-center mb-5">
         <div class="flex justify-center mb-2">${avatarHtml(user, 20)}</div>
-        <p class="font-semibold text-slate-800 dark:text-slate-100">${user.name}</p>
-        <p class="text-xs text-slate-400 mb-4">${deptLabel(user.dept)} &middot; ${user.jobTitle}</p>
+        <p class="font-semibold text-slate-800 dark:text-slate-100">${esc(user.name)}</p>
+        <p class="text-xs text-slate-400 mb-4">${esc(deptLabel(user.dept))} &middot; ${esc(user.jobTitle)}</p>
         <label class="inline-block cursor-pointer text-sm bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-medium px-4 py-2 rounded-lg">
           Change Profile Picture
           <input type="file" id="avatarInput" accept="image/*" class="hidden" />
@@ -1225,11 +1172,11 @@ function renderSettings() {
 function changePassword() {
   const p1 = document.getElementById('newPassword').value;
   const p2 = document.getElementById('confirmPassword').value;
-  if (!p1 || p1.length < 4) { toast('Password must be at least 4 characters', 'error'); return; }
+  if (!p1 || p1.length < 6) { toast('Password must be at least 6 characters', 'error'); return; }
   if (p1 !== p2) { toast('Passwords do not match', 'error'); return; }
   const user = currentUser();
   const db = getDB();
-  db.users.find(u => u.id === user.id).password = p1;
+  setPw(db.users.find(u => u.id === user.id), p1);
   setDB(db);
   document.getElementById('newPassword').value = '';
   document.getElementById('confirmPassword').value = '';
@@ -1415,7 +1362,11 @@ function adminNavItems() {
     { key: 'evaluations', label: 'All Evaluations', icon: '📊' },
     { key: 'toppers', label: 'Top Performers', icon: '⭐' },
     { key: 'completion', label: 'Completion Tracker', icon: '✅' },
-    { key: 'leaderboard', label: 'Leaderboard', icon: '🏆' }
+    { key: 'leaderboard', label: 'Leaderboard', icon: '🏆' },
+    { key: 'requests', label: 'Account Requests', icon: '🧾' },
+    { key: 'feedback', label: 'Feedback', icon: '💬' },
+    { key: 'announcements', label: 'Announcements', icon: '📣' },
+    { key: 'settings', label: 'Settings', icon: '⚙️' }
   ];
 }
 
@@ -1430,14 +1381,14 @@ function adminShell(activeKey, innerHtml) {
       <div class="p-4 border-b border-slate-700 flex items-center gap-3">
         <div class="w-11 h-11 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 text-white flex items-center justify-center font-bold">🔐</div>
         <div class="min-w-0">
-          <p class="font-semibold text-sm truncate">${admin.displayName}</p>
+          <p class="font-semibold text-sm truncate">${esc(admin.displayName)}</p>
           <p class="text-xs text-slate-400 truncate">Administrator</p>
         </div>
       </div>
       <nav class="flex-1 py-2">
         ${items.map(it => `
           <a href="#/${it.key === 'admin' ? 'admin' : 'admin/' + it.key}" class="flex items-center gap-3 px-4 py-2.5 text-sm font-medium ${activeKey === it.key ? 'bg-slate-800 text-amber-300 border-r-4 border-amber-400' : 'text-slate-300 hover:bg-slate-800'}">
-            <span>${it.icon}</span><span>${it.label}</span>
+            <span>${it.icon}</span><span>${it.label}</span>${adminNavBadge(it.key)}
           </a>`).join('')}
       </nav>
       <div class="p-4 border-t border-slate-700">
@@ -1449,6 +1400,7 @@ function adminShell(activeKey, innerHtml) {
         <div class="flex items-center gap-2 font-bold text-lg">
           ${brandHtml('<span class="text-xs font-semibold text-amber-500 bg-amber-100 dark:bg-amber-900/40 px-2 py-0.5 rounded-full ml-2">ADMIN</span>')}
         </div>
+        ${headerToolsHtml()}
       </div>
       ${innerHtml}
     </main>
@@ -1465,6 +1417,8 @@ function renderAdminDashboard() {
   const totalDepts = db.departments.length;
   const totalEvals = db.evaluations.length;
   const weightTotal = db.criteria.reduce((a, c) => a + c.weight, 0);
+  const pendingReq = (db.accountRequests || []).filter(r => r.status === 'pending').length;
+  const newFb = (db.feedback || []).filter(f => !(f.readBy || []).includes(admin.id)).length;
 
   const statCard = (label, value, icon, warn) => `
     <div class="bg-white dark:bg-slate-800 rounded-xl card-shadow p-5">
@@ -1477,13 +1431,16 @@ function renderAdminDashboard() {
     </div>`;
 
   adminShell('admin', `
-    <h1 class="text-xl font-bold text-slate-800 dark:text-slate-100 mb-5">Welcome back, ${admin.displayName} 👋</h1>
-    <div class="grid sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+    <h1 class="text-xl font-bold text-slate-800 dark:text-slate-100 mb-5">Welcome back, ${esc(admin.displayName)} 👋</h1>
+    ${checkPw(admin, 'admin123') ? '<div class="mb-4 rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-200 px-4 py-3 text-sm">⚠️ You are still using the default admin password. <a href="#/admin/settings" class="underline font-semibold">Change it in Settings</a>.</div>' : ''}
+    <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
       ${statCard('Employees', totalEmployees, '🧑‍💻')}
       ${statCard('Supervisors', totalSupervisors, '🧑‍💼')}
       ${statCard('Departments', totalDepts, '🏷️')}
       ${statCard('Evaluations Submitted', totalEvals, '📊')}
       ${statCard('Criteria Weight Total', weightTotal + '%', '🧮', weightTotal !== 100)}
+      ${statCard('Pending Account Requests', pendingReq, '🧾')}
+      ${statCard('New Feedback', newFb, '💬')}
     </div>
     <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
       <a href="#/admin/employees" class="bg-white dark:bg-slate-800 rounded-xl card-shadow p-5 hover:ring-2 hover:ring-emerald-400 transition">
@@ -1513,6 +1470,22 @@ function renderAdminDashboard() {
       <a href="#/admin/leaderboard" class="bg-white dark:bg-slate-800 rounded-xl card-shadow p-5 hover:ring-2 hover:ring-emerald-400 transition">
         <p class="font-semibold text-slate-700 dark:text-slate-200 mb-1">🏆 Leaderboard</p>
         <p class="text-xs text-slate-400">Company-wide ranking with Excel and PDF export.</p>
+      </a>
+      <a href="#/admin/requests" class="bg-white dark:bg-slate-800 rounded-xl card-shadow p-5 hover:ring-2 hover:ring-emerald-400 transition">
+        <p class="font-semibold text-slate-700 dark:text-slate-200 mb-1">🧾 Account Requests</p>
+        <p class="text-xs text-slate-400">Review new users, confirm payment, then approve or decline.</p>
+      </a>
+      <a href="#/admin/feedback" class="bg-white dark:bg-slate-800 rounded-xl card-shadow p-5 hover:ring-2 hover:ring-emerald-400 transition">
+        <p class="font-semibold text-slate-700 dark:text-slate-200 mb-1">💬 Feedback</p>
+        <p class="text-xs text-slate-400">Read what employees and supervisors send from Help &amp; Feedback.</p>
+      </a>
+      <a href="#/admin/announcements" class="bg-white dark:bg-slate-800 rounded-xl card-shadow p-5 hover:ring-2 hover:ring-emerald-400 transition">
+        <p class="font-semibold text-slate-700 dark:text-slate-200 mb-1">📣 Announcements</p>
+        <p class="text-xs text-slate-400">Notify everyone about the evaluation week or a website update.</p>
+      </a>
+      <a href="#/admin/settings" class="bg-white dark:bg-slate-800 rounded-xl card-shadow p-5 hover:ring-2 hover:ring-emerald-400 transition">
+        <p class="font-semibold text-slate-700 dark:text-slate-200 mb-1">⚙️ Settings</p>
+        <p class="text-xs text-slate-400">Your profile, password, theme, sync status and backup.</p>
       </a>
     </div>
   `);
@@ -1639,7 +1612,7 @@ function openAdminEmployeeModal(id) {
         </div>
         <div class="sm:col-span-2">
           <label class="block text-sm text-slate-500 dark:text-slate-300 mb-1">Password ${emp ? '(leave blank to keep unchanged)' : ''}</label>
-          <input id="fEmpPassword" type="text" class="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg px-3 py-2" placeholder="${emp ? '' : 'demo123'}" />
+          <input id="fEmpPassword" type="text" class="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg px-3 py-2" placeholder="${emp ? '' : 'Set a password (min. 6 characters)'}" />
         </div>
       </div>
       <div class="px-5 py-4 bg-slate-50 dark:bg-slate-900/40 flex justify-end gap-2">
@@ -1657,14 +1630,16 @@ function saveAdminEmployee(id) {
   const jobTitle = document.getElementById('fEmpJobTitle').value.trim();
   const password = document.getElementById('fEmpPassword').value;
   if (!name || !jobTitle) { toast('Name and job title are required', 'error'); return; }
+  if (password && password.length < 6) { toast('Password must be at least 6 characters', 'error'); return; }
+  if (!id && !password) { toast('Set a password for the new account', 'error'); return; }
   const db = getDB();
   if (id) {
     const u = db.users.find(x => x.id === id);
     Object.assign(u, { name, dept, role, jobTitle });
-    if (password) u.password = password;
+    if (password) setPw(u, password);
     if (_pendingEmpAvatar !== undefined) u.avatar = _pendingEmpAvatar;
   } else {
-    db.users.push({ id: uid('u'), name, dept, role, jobTitle, password: password || 'demo123', avatar: _pendingEmpAvatar || null });
+    db.users.push(setPw({ id: uid('u'), name, dept, role, jobTitle, avatar: _pendingEmpAvatar || null }, password));
   }
   _pendingEmpAvatar = undefined;
   setDB(db);
@@ -1941,7 +1916,7 @@ function saveScaleTier(id) {
     const r = db.ratingScale.find(x => x.id === id);
     Object.assign(r, { min, max, label });
   } else {
-    db.ratingScale.push({ id: uid('rs'), min, max, label });
+    db.ratingScale.push({ id: 'rs8', min, max, label });
   }
   setDB(db);
   closeModal();
@@ -2001,7 +1976,7 @@ function saveReward(id) {
     const r = db.rewards.find(x => x.id === id);
     Object.assign(r, { level, benefits, desc });
   } else {
-    db.rewards.push({ id: uid('rw'), level, benefits, desc });
+    db.rewards.push({ id: 'rw8', level, benefits, desc });
   }
   setDB(db);
   closeModal();
@@ -2150,7 +2125,7 @@ function saveBenefit(id) {
   const db = getDB();
   db.benefits = db.benefits || [];
   if (id) { Object.assign(db.benefits.find(x => x.id === id), { benefit, desc }); }
-  else { db.benefits.push({ id: uid('bd'), benefit, desc }); }
+  else { db.benefits.push({ id: 'bd9', benefit, desc }); }
   setDB(db);
   closeModal();
   toast('Benefit saved');
